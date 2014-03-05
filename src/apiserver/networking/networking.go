@@ -94,7 +94,7 @@ type ApiMessage struct {
 	} `json:"data"`
 }
 
-func handleConn(conn net.Conn) {
+func HandleConnection(conn net.Conn) {
 	connection := NewConnection(conn)
 	defer func() {
 		for _, ch := range connection.subscribtions {
@@ -196,7 +196,7 @@ func StartTCPServer(port uint16) error {
 				log.Print(err)
 				continue
 			}
-			go handleConn(conn)
+			go HandleConnection(conn)
 		}
 	}()
 	return nil
