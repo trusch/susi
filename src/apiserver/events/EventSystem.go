@@ -35,6 +35,26 @@ type EventSystem struct {
 	topics  map[string]map[int64]chan interface{}
 }
 
+func (ptr *EventSystem) subscribe(topic string) (eventChannel chan interface{},closeChannel chan bool) {
+	eventChannel = make(chan interface{},10)
+	closeChannel = make(chan bool)
+	now := time.Now().UnixNano();
+	channelMap := ptr.topics[topic]
+	if channelMap==nil {
+		tmp := make(map[int64]chan interface{})
+		ptr.topics[topic] = tmp
+		channelMap = tmp
+	}
+	channelMap[now] = eventChannel
+	log.Print("subscribed to ",topic," (",now,")")
+	go func(){
+		<-closeChannel
+		log.Print("unsubscribed from ",topic," (",now,")")
+		delete(channelMap,now)
+	}()
+	return eventChannel,closeChannel
+}
+
 var eventSystem *EventSystem
 
 func init() {
@@ -46,30 +66,19 @@ func init() {
 			switch cmd.Type {
 			case SUBSCRIBE:
 				{
-					eventChan := make(chan interface{},10)
-					unsubscribeChan := make(chan bool)
-					channelMap := eventSystem.topics[cmd.Topic]
-					if channelMap==nil {
-						tmp := make(map[int64]chan interface{})
-						eventSystem.topics[cmd.Topic] = tmp
-						channelMap = tmp
-					}
-					now := time.Now().UnixNano();
-					channelMap[now] = eventChan
-					log.Print("subscribtion to ",cmd.Topic)
-					go func(){
-						<-unsubscribeChan
-						log.Print("delete subscribtion to ",cmd.Topic)
-						delete(channelMap,now)
-					}()			
+					ec,cc := eventSystem.subscribe(cmd.Topic)
 					cmd.Result <- unsubscribeResult{
-						EventChan: eventChan,
-						CloseChan: unsubscribeChan,
+						EventChan: ec,
+						CloseChan: cc,
 					}
 				}
 			case PUBLISH:
 				{
 					chans := eventSystem.topics[cmd.Topic]
+					if len(chans) == 0 {
+						cmd.Result <- false
+						break
+					}
 					for key, outChan := range chans {
 						err := safeSend(outChan,cmd.Payload)
 						if err!=nil {
@@ -77,6 +86,7 @@ func init() {
 							delete(chans,key)
 						}
 					}
+					cmd.Result <- true
 				}
 			}
 		}
@@ -100,13 +110,16 @@ func safeSend(c chan interface{}, t interface{}) (err error) {
 /*
 Global publish function
 */
-func Publish(topic string, payload interface{}) {
+func Publish(topic string, payload interface{}) bool{
 	command := &command{
 		Type:    PUBLISH,
 		Topic:   topic,
 		Payload: payload,
+		Result:  make(chan interface{}),
 	}
 	eventSystem.cmdChan <- command
+	res := (<-command.Result).(bool)
+	return res
 }
 
 /*
