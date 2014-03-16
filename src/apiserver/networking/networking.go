@@ -53,6 +53,14 @@ func (conn *Connection) subscribe(req *ApiMessage) {
 						resp.Type = "event"
 						resp.Data.Key = topic
 						resp.Data.Payload = event
+						if evt,ok := event.(map[string]interface{}); ok {
+							if topic,ok = evt["topic"].(string);ok {
+								resp.Data.Key = topic
+								if pay,ok := evt["payload"]; ok {
+									resp.Data.Payload = pay
+								}
+							}
+						}
 						err := conn.sender.Send(resp)
 						if err != nil {
 							log.Print(err)
