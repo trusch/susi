@@ -8,6 +8,8 @@ import (
 	"log"
 	"time"
 	"errors"
+	"path/filepath"
+	"strings"
 )
 
 type CommandType uint8
@@ -17,6 +19,21 @@ const (
 	UNSUBSCRIBE
 	PUBLISH
 )
+
+type EventSystem struct {
+	cmdChan chan *command
+	topics  map[string]map[int64]chan interface{}
+	globs map[int64]*globChan
+}
+
+type globChan struct {
+	EventChan chan interface{}
+	Glob string
+}
+
+func isGlob(pattern string) bool {
+	return strings.IndexAny(pattern, "*?[") >= 0
+}
 
 type command struct {
 	Type    CommandType
@@ -30,27 +47,33 @@ type unsubscribeResult struct {
 	CloseChan chan bool
 }
 
-type EventSystem struct {
-	cmdChan chan *command
-	topics  map[string]map[int64]chan interface{}
-}
-
 func (ptr *EventSystem) subscribe(topic string) (eventChannel chan interface{},closeChannel chan bool) {
 	eventChannel = make(chan interface{},10)
 	closeChannel = make(chan bool)
 	now := time.Now().UnixNano();
-	channelMap := ptr.topics[topic]
-	if channelMap==nil {
-		tmp := make(map[int64]chan interface{})
-		ptr.topics[topic] = tmp
-		channelMap = tmp
+	if(isGlob(topic)){
+		glob := new(globChan)
+		glob.EventChan = eventChannel
+		glob.Glob = topic
+		ptr.globs[now] = glob
+	}else{
+		channelMap := ptr.topics[topic]
+		if channelMap==nil {
+			tmp := make(map[int64]chan interface{})
+			ptr.topics[topic] = tmp
+			channelMap = tmp
+		}
+		channelMap[now] = eventChannel
 	}
-	channelMap[now] = eventChannel
 	log.Print("subscribed to ",topic," (",now,")")
 	go func(){
 		<-closeChannel
 		log.Print("unsubscribed from ",topic," (",now,")")
-		delete(channelMap,now)
+		ptr.cmdChan <- &command{
+			Type: UNSUBSCRIBE,
+			Topic: topic,
+			Payload: now,
+		}
 	}()
 	return eventChannel,closeChannel
 }
@@ -61,6 +84,7 @@ func init() {
 	eventSystem = new(EventSystem)
 	eventSystem.cmdChan = make(chan *command, 10)
 	eventSystem.topics = make(map[string]map[int64]chan interface{})
+	eventSystem.globs = make(map[int64]*globChan)
 	go func() {
 		for cmd := range eventSystem.cmdChan {
 			switch cmd.Type {
@@ -75,18 +99,32 @@ func init() {
 			case PUBLISH:
 				{
 					chans := eventSystem.topics[cmd.Topic]
-					if len(chans) == 0 {
-						cmd.Result <- false
-						break
-					}
-					for key, outChan := range chans {
-						err := safeSend(outChan,cmd.Payload)
-						if err!=nil {
-							log.Print(err)
-							delete(chans,key)
+					found := false
+					for _,glob := range eventSystem.globs {
+						if ok,err := filepath.Match(glob.Glob,cmd.Topic); ok && err==nil {
+							found = true
+							event := make(map[string]interface{})
+							event["payload"] = cmd.Payload
+							event["topic"] = cmd.Topic
+							glob.EventChan <- event
 						}
 					}
-					cmd.Result <- true
+					for _, outChan := range chans {
+						outChan <- cmd.Payload
+						found = true
+					}
+					cmd.Result <- found
+				}
+			case UNSUBSCRIBE:
+				{
+					topic := cmd.Topic
+					id := cmd.Payload.(int64)
+					if topic!="" {
+						chans := eventSystem.topics[topic]
+						delete(chans,id)
+					}else{
+						delete(eventSystem.globs,id)
+					}
 				}
 			}
 		}
