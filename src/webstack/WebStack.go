@@ -13,7 +13,12 @@ import (
 	"strconv"
 	"time"
 	"errors"
+	"flag"
 )
+
+var maxPostMessageSize = flag.Int64("maxpostsize",1024,"maximal post message size")
+var webPort = flag.String("webport","8080","the web port")
+var assetRoot = flag.String("assets","../../assets","The asset root folder")
 
 type BatchMessage map[string]map[string][]*struct{
 	Action string `json:"a,omitempty"`
@@ -29,7 +34,7 @@ func PostHandler(w http.ResponseWriter, req *http.Request) {
 		http.Error(w, "No request could be read", http.StatusMethodNotAllowed)
 		return
 	}
-	decoder := json.NewDecoder(io.LimitReader(req.Body,1024))
+	decoder := json.NewDecoder(io.LimitReader(req.Body,*maxPostMessageSize))
 	packet := make(BatchMessage)
 	err := decoder.Decode(&packet)
 	if err != nil {
@@ -94,9 +99,8 @@ func GetControllerCallAwnser(controller,call string, payload interface{}, timeou
 	}
 	log.Print(timeout)
 	select {
-		case result = <-resultChan:{
-		}
-		case <-time.After(timeout):{
+		case result = <-resultChan: {}
+		case <-time.After(timeout): {
 			log.Print("timeout!")
 			err = errors.New("timeout while calling "+requestTopic)
 		}
@@ -105,8 +109,11 @@ func GetControllerCallAwnser(controller,call string, payload interface{}, timeou
 }
 
 func main(){
+	flag.Parse()
 	log.SetFlags(log.Ldate | log.Ltime | log.Lshortfile)
 	http.HandleFunc("/batch",PostHandler)
-	http.ListenAndServe(":8080",nil)
+	http.Handle("/assets/", http.StripPrefix("/assets/", http.FileServer(http.Dir(*assetRoot))))
+	http.Handle("/", http.RedirectHandler("/assets/main.html", 301))
+	http.ListenAndServe(":"+*webPort,nil)
 }
 
