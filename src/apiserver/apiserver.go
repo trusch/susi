@@ -4,6 +4,7 @@ import (
 	// "./events"
 	// "./state"
 	"./networking"
+	_ "./autodiscovery"
 	"log"
 )
 
