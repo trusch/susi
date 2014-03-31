@@ -5,78 +5,164 @@ import (
 	"log"
 	"flag"
 	"strings"
+	"strconv"
 )
 
 var ownIPAddr = flag.String("addr","","your addr in form 192.0.0.123:55555")
+var autodiscoveryMuticastPort = flag.Int("autodiscoveryMcastPort",4242,"the autodiscovery multicast port")
+var autodiscoveryTcpPort = flag.Int("autodiscoveryTcpPort",4242,"the autodiscovery tcp port")
+var autodiscoveryAnouncePort = flag.Int("autodiscoveryAnouncePort",12345,"the autodiscovery tcp port")
+
+type AutodiscoveryManager struct {
+	Input chan string
+	Hosts map[string]bool
+}
+
+func(ptr *AutodiscoveryManager) backend(){
+	ptr.Input = make(chan string,10)
+	ptr.Hosts = make(map[string]bool)
+	own := GetOwnAddr(strconv.Itoa(*autodiscoveryAnouncePort))
+	for str := range ptr.Input {
+		if _,ok := ptr.Hosts[str]; !ok {
+			if str==own {
+				continue
+			}
+			ptr.Hosts[str] = true
+			log.Print("new host: ",str)
+		}
+	}
+}
+
+func NewAutodiscoveryManager() *AutodiscoveryManager{
+	res := new(AutodiscoveryManager)
+	go res.backend();
+	return res
+}
+
+var manager = NewAutodiscoveryManager()
 
 func GetOwnAddr(ownPort string) string {
-	if *ownIPAddr=="" {
-		addrs,err := net.InterfaceAddrs();
-		if err!=nil {
-			log.Fatal(err)
-		}
-		blacklist := []string{
-			"127.",
-			"::1",
-			"fe80:",
-		}
-
-		OUTERLOOP:
-		for _,addr := range addrs {
-			for _,black := range blacklist {
-				if strings.HasPrefix(addr.String(),black){
-					continue OUTERLOOP
-				}
-			}
-			parts := strings.Split(addr.String(),"/")
-			*ownIPAddr = parts[0]+":"+ownPort
-			break
-		}
+	ownIPAddr := ""
+	addrs,err := net.InterfaceAddrs();
+	if err!=nil {
+		log.Println(err)
+		return ""
 	}
-	return *ownIPAddr
+	blacklist := []string{
+		"127.",
+		"::1",
+		"fe80:",
+	}
+
+	OUTERLOOP:
+	for _,addr := range addrs {
+		for _,black := range blacklist {
+			if strings.HasPrefix(addr.String(),black){
+				continue OUTERLOOP
+			}
+		}
+		parts := strings.Split(addr.String(),"/")
+		ownIPAddr = parts[0]+":"+ownPort
+		break
+	}
+
+	return ownIPAddr
 } 
 
-func ListenForBroadcastMessage(port int){
-	socket, err := net.ListenUDP("udp4", &net.UDPAddr{
-		IP:   net.IPv4(255,255,255,255),
-		Port: port,
-	})
-
+func ListenForMulticastMessage(port int){
+	ownAddr := GetOwnAddr(strconv.Itoa(*autodiscoveryAnouncePort))
+	mcaddr, err := net.ResolveUDPAddr("udp", "224.0.0.23:"+strconv.Itoa(port))
 	if err != nil {
-		log.Fatal(err)
+		log.Println(err)
+		return
 	}
-
+	socket, err := net.ListenMulticastUDP("udp4", nil,mcaddr)
 	if err != nil {
-		log.Fatal(err)
+		log.Println(err)
+		return
 	}
-
 	go func(){
 		defer socket.Close()
 		buff := make([]byte, 4096)
 		for {
 			read, err := socket.Read(buff[0:])
 			if err != nil {
-				log.Fatal(err)
+				log.Println(err)
+				return
 			}
-			msgType := buff[0]
-			msg := string(buff[1:read])
-			switch msgType {
-				case 'r': {
-					log.Println(msg)
+			addr := string(buff[:read])
+			SendDirectMessage(addr,ownAddr)
+		}
+	}()	
+}
 
-				}
+func ListenForDirectMessage(port int){
+	ownAddr := GetOwnAddr(strconv.Itoa(*autodiscoveryAnouncePort))
+	accp, err := net.Listen("tcp",":"+strconv.Itoa(port))
+	if err != nil {
+		log.Println(err)
+		return
+	}
+	go func(){
+		for {
+			conn,err := accp.Accept()
+			if err!=nil {
+				log.Println(err)
+				return
+			}else{
+				go func(){
+					defer conn.Close()
+					buff := make([]byte, 4096)
+					bs,err := conn.Read(buff)
+					if err!=nil {
+						log.Println(err)
+						return
+					}
+					msg := string(buff[:bs])
+					conn.Write([]byte(ownAddr))
+					manager.Input <- msg
+				}()
 			}
 		}
 	}()	
 }
 
-func StartAutodiscovery(){
-	ListenForBroadcastMessage(4242);
-	conn,err := net.Dial("udp","255.255.255.255:4242")
+func SendMulticastMessage(port int,msg string){
+	portStr := strconv.Itoa(port)
+	conn,err := net.Dial("udp","224.0.0.23:"+portStr)
 	if err!=nil {
-		log.Fatal(err)
+		log.Println(err)
+		return
 	}
-	conn.Write([]byte("rFoobar!"))
-	log.Print(GetOwnAddr("12345"))
+	conn.Write([]byte(msg))
 	conn.Close()
+}
+
+func SendDirectMessage(addr, msg string){
+	conn,err := net.Dial("tcp",addr)
+	if err!=nil {
+		log.Println(err)
+		return
+	}
+	defer conn.Close()
+	_,err = conn.Write([]byte(msg))
+	if err!=nil {
+		log.Println(err)
+		return
+	}
+	buff := make([]byte,1024)
+	bs,err := conn.Read(buff)
+	if err!=nil {
+		log.Println(err)
+		return
+	}
+	msg = string(buff[:bs])
+	manager.Input <- msg
+}
+
+func Run(){
+	flag.Parse()
+	ListenForMulticastMessage(*autodiscoveryMuticastPort)
+	ListenForDirectMessage(*autodiscoveryTcpPort)
+	SendMulticastMessage(*autodiscoveryMuticastPort,GetOwnAddr(strconv.Itoa(*autodiscoveryTcpPort)))
 }
