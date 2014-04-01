@@ -8,7 +8,6 @@ import (
 	"strconv"
 )
 
-var ownIPAddr = flag.String("addr","","your addr in form 192.0.0.123:55555")
 var autodiscoveryMuticastPort = flag.Int("autodiscoveryMcastPort",4242,"the autodiscovery multicast port")
 var autodiscoveryTcpPort = flag.Int("autodiscoveryTcpPort",4242,"the autodiscovery tcp port")
 var autodiscoveryAnouncePort = flag.Int("autodiscoveryAnouncePort",12345,"the autodiscovery tcp port")
@@ -18,10 +17,13 @@ type AutodiscoveryManager struct {
 	Hosts map[string]bool
 }
 
-func(ptr *AutodiscoveryManager) backend(){
+func (ptr *AutodiscoveryManager) backend(){
 	ptr.Input = make(chan string,10)
 	ptr.Hosts = make(map[string]bool)
-	own := GetOwnAddr(strconv.Itoa(*autodiscoveryAnouncePort))
+	ptr.ListenForMulticastMessage(*autodiscoveryMuticastPort)
+	ptr.ListenForDirectMessage(*autodiscoveryTcpPort)
+	own := ptr.GetOwnAddr(strconv.Itoa(*autodiscoveryAnouncePort))
+	ptr.SendMulticastMessage(*autodiscoveryMuticastPort,ptr.GetOwnAddr(strconv.Itoa(*autodiscoveryTcpPort)))
 	for str := range ptr.Input {
 		if _,ok := ptr.Hosts[str]; !ok {
 			if str==own {
@@ -39,9 +41,8 @@ func NewAutodiscoveryManager() *AutodiscoveryManager{
 	return res
 }
 
-var manager = NewAutodiscoveryManager()
 
-func GetOwnAddr(ownPort string) string {
+func (ptr *AutodiscoveryManager) GetOwnAddr(ownPort string) string {
 	ownIPAddr := ""
 	addrs,err := net.InterfaceAddrs();
 	if err!=nil {
@@ -69,8 +70,8 @@ func GetOwnAddr(ownPort string) string {
 	return ownIPAddr
 } 
 
-func ListenForMulticastMessage(port int){
-	ownAddr := GetOwnAddr(strconv.Itoa(*autodiscoveryAnouncePort))
+func (ptr *AutodiscoveryManager) ListenForMulticastMessage(port int){
+	ownAddr := ptr.GetOwnAddr(strconv.Itoa(*autodiscoveryAnouncePort))
 	mcaddr, err := net.ResolveUDPAddr("udp", "224.0.0.23:"+strconv.Itoa(port))
 	if err != nil {
 		log.Println(err)
@@ -91,13 +92,13 @@ func ListenForMulticastMessage(port int){
 				return
 			}
 			addr := string(buff[:read])
-			SendDirectMessage(addr,ownAddr)
+			ptr.SendDirectMessage(addr,ownAddr)
 		}
 	}()	
 }
 
-func ListenForDirectMessage(port int){
-	ownAddr := GetOwnAddr(strconv.Itoa(*autodiscoveryAnouncePort))
+func (ptr *AutodiscoveryManager) ListenForDirectMessage(port int){
+	ownAddr := ptr.GetOwnAddr(strconv.Itoa(*autodiscoveryAnouncePort))
 	accp, err := net.Listen("tcp",":"+strconv.Itoa(port))
 	if err != nil {
 		log.Println(err)
@@ -120,14 +121,14 @@ func ListenForDirectMessage(port int){
 					}
 					msg := string(buff[:bs])
 					conn.Write([]byte(ownAddr))
-					manager.Input <- msg
+					ptr.Input <- msg
 				}()
 			}
 		}
 	}()	
 }
 
-func SendMulticastMessage(port int,msg string){
+func (ptr *AutodiscoveryManager) SendMulticastMessage(port int,msg string){
 	portStr := strconv.Itoa(port)
 	conn,err := net.Dial("udp","224.0.0.23:"+portStr)
 	if err!=nil {
@@ -138,7 +139,7 @@ func SendMulticastMessage(port int,msg string){
 	conn.Close()
 }
 
-func SendDirectMessage(addr, msg string){
+func (ptr *AutodiscoveryManager) SendDirectMessage(addr, msg string){
 	conn,err := net.Dial("tcp",addr)
 	if err!=nil {
 		log.Println(err)
@@ -157,12 +158,10 @@ func SendDirectMessage(addr, msg string){
 		return
 	}
 	msg = string(buff[:bs])
-	manager.Input <- msg
+	ptr.Input <- msg
 }
 
 func Run(){
 	flag.Parse()
-	ListenForMulticastMessage(*autodiscoveryMuticastPort)
-	ListenForDirectMessage(*autodiscoveryTcpPort)
-	SendMulticastMessage(*autodiscoveryMuticastPort,GetOwnAddr(strconv.Itoa(*autodiscoveryTcpPort)))
+	NewAutodiscoveryManager()	
 }
