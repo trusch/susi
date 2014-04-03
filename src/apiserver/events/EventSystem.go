@@ -76,10 +76,10 @@ func (ptr *EventSystem) subscribe(topic string) (eventChannel chan interface{},c
 		}
 		channelMap[now] = eventChannel
 	}
-	log.Print("subscribed to ",topic," (",now,")")
+	//log.Print("subscribed to ",topic," (",now,")")
 	go func(){
 		<-closeChannel
-		log.Print("unsubscribed from ",topic," (",now,")")
+		//log.Print("unsubscribed from ",topic," (",now,")")
 		ptr.cmdChan <- &command{
 			Type: UNSUBSCRIBE,
 			Topic: topic,

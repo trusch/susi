@@ -12,16 +12,27 @@
 package main
 
 import (
-	// "./events"
-	// "./state"
+	"./events"
+	"./config"
 	"./networking"
 	"./autodiscovery"
 	"log"
 )
 
+func EventPrinter() {
+	ch,_ := events.Subscribe("*");
+	go func(){
+		for evt := range ch {
+			log.Println(evt)
+		}
+	}()
+}
+
 func main() {
 	log.SetFlags(log.Ldate | log.Ltime | log.Lshortfile)
-	networking.StartTCPServer(uint16(12345))
+	config.NewManager()
+	EventPrinter();
+	networking.StartTCPServer()
 	autodiscovery.Run()
 	select {}
 }

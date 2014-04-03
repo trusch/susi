@@ -182,3 +182,7 @@ func Pop(key string) interface{} {
 	stateMachine.cmdChan <- cmd
 	return <-cmd.Return
 }
+
+func Print(){
+	log.Print(stateMachine.state)
+}

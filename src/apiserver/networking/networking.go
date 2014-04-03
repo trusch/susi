@@ -17,8 +17,10 @@ import (
 	"encoding/json"
 	"log"
 	"net"
-	"strconv"
+	"flag"
 )
+
+var apiTcpPort = flag.String("apiTcpPort","4242","The port of the susi api server")
 
 type subscribtionsType map[string]chan bool
 
@@ -203,10 +205,11 @@ func HandleConnection(conn net.Conn) {
 	}
 }
 
-func StartTCPServer(port uint16) error {
-	listener, err := net.Listen("tcp", ":"+strconv.FormatInt(int64(port), 10))
+func StartTCPServer() error {
+	portStr := state.Get("apiTcpPort").(string)
+	listener, err := net.Listen("tcp", ":"+portStr)
 	if err != nil {
-		return err
+		log.Fatal(err)
 	}
 	go func() {
 		for {
@@ -218,5 +221,6 @@ func StartTCPServer(port uint16) error {
 			go HandleConnection(conn)
 		}
 	}()
+	log.Print("successfully started susi api server on ",listener.Addr())
 	return nil
 }
