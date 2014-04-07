@@ -17,7 +17,8 @@ import(
 	"net"
 	"encoding/json"
 	"log"
-	"../state"
+	"strings"
+	//"../state"
 )
 
 type RemoteEventCollector struct {
@@ -38,8 +39,10 @@ func (ptr *RemoteEventCollector) HandleAwnsers(conn net.Conn) {
 			case "status": {
 				log.Print(msg.Data.Payload)
 			}
-			case "event": {
-				events.Publish(msg.Data.Key,msg.Data.Payload)
+			case "event": { 
+				parts := strings.Split(msg.Data.Key,"@")
+				key := parts[0]
+				events.Publish(key,msg.Data.Payload)
 			}
 		}
 	}
@@ -67,10 +70,9 @@ func (ptr *RemoteEventCollector) ConnectToHost(addr string){
 
 func New() *RemoteEventCollector {
 	ptr := new(RemoteEventCollector)
-	name := state.Get("apiTcpPort").(string)
-	ptr.OwnNames = []string{name}
-	ch,_ := events.Subscribe("hosts::new");
-	ptr.NewHostChan = ch
+	ptr.OwnNames = []string{"all"}
+	hCh,_ := events.Subscribe("hosts::new");
+	ptr.NewHostChan = hCh
 	go func(){
 		for event := range ptr.NewHostChan {
 			hostAddr := event.(string)

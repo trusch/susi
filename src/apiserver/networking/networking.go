@@ -20,7 +20,7 @@ import (
 	"flag"
 )
 
-var apiTcpPort = flag.String("apiTcpPort","4242","The port of the susi api server")
+var apiTcpPort = flag.String("apiserver.tcpPort","4242","The port of the susi api server")
 
 type subscribtionsType map[string]chan bool
 
@@ -206,7 +206,7 @@ func HandleConnection(conn net.Conn) {
 }
 
 func StartTCPServer() error {
-	portStr := state.Get("apiTcpPort").(string)
+	portStr := state.Get("apiserver.tcpPort").(string)
 	listener, err := net.Listen("tcp", ":"+portStr)
 	if err != nil {
 		log.Fatal(err)
@@ -224,3 +224,4 @@ func StartTCPServer() error {
 	log.Print("successfully started susi api server on ",listener.Addr())
 	return nil
 }
+

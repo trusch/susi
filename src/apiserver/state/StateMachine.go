@@ -13,6 +13,8 @@ package state
 
 import (
 	"log"
+	"strings"
+	"errors"
 )
 
 const (
@@ -42,6 +44,28 @@ type StateMachine struct {
 	maxListLen int
 }
 
+func (sm *StateMachine) getObject(key string) (map[string]interface{},string,error) {
+	parts := strings.Split(key,".")
+	if len(parts)==1 {
+		return sm.state,key,nil
+	}
+	curObj := sm.state
+	for i:=0;i<len(parts)-1;i++ {
+		if nextObj,ok := curObj[parts[i]]; !ok {
+			nextObj := make(map[string]interface{})
+			curObj[parts[i]] = nextObj
+			curObj = nextObj	
+		}else{
+			if obj,ok := nextObj.(map[string]interface{}); !ok {
+				return nil,"",errors.New("key collision")
+			}else{
+				curObj = obj
+			}
+		}
+	}
+	return curObj,parts[len(parts)-1],nil
+}
+
 var stateMachine *StateMachine
 
 func init() {
@@ -54,11 +78,22 @@ func init() {
 			switch cmd.Type {
 			case SET:
 				{
-					stateMachine.state[cmd.Key] = cmd.Value
+					obj,key,err := stateMachine.getObject(cmd.Key)
+					if err==nil {
+						obj[key] = cmd.Value
+						log.Print(stateMachine.state,key)
+					}else{
+						log.Print(err)
+					}
 				}
 			case GET:
 				{
-					cmd.Return <- stateMachine.state[cmd.Key]
+					obj,key,err := stateMachine.getObject(cmd.Key)
+					if err!=nil {
+						cmd.Return <- "Error: "+err.Error()
+					}else{
+						cmd.Return <- obj[key]
+					}
 				}
 			case PUSH,ENQUEUE:
 				{

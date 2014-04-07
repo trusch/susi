@@ -42,7 +42,7 @@ func (ptr *ConfigManager) LoadFileToState(filename string) error {
 		return err
 	}
 	for key,val := range data {
-		/*log.Print("load config: ",key," : ",val)*/
+		log.Print("load config: ",key," : ",val)
 		state.Set(key,val)
 	}
 	return nil
@@ -90,7 +90,7 @@ func NewManager() *ConfigManager{
 		time.Sleep(5*time.Second)
 		for{
 			ptr.LoadFiles()
-			ptr.LoadFlags()
+			//ptr.LoadFlags()
 
 			time.Sleep(5*time.Second)
 		}
