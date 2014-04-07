@@ -16,6 +16,7 @@ import (
 	"./config"
 	"./networking"
 	"./autodiscovery"
+	"./remoteeventcollector"
 	"log"
 )
 
@@ -33,6 +34,8 @@ func main() {
 	config.NewManager()
 	EventPrinter();
 	networking.StartTCPServer()
+	remoteeventcollector.New()
 	autodiscovery.Run()
+
 	select {}
 }
