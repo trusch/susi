@@ -12,30 +12,38 @@
 package main
 
 import (
-	"./events"
-	"./config"
-	"./networking"
+	"./apiserver"
 	"./autodiscovery"
+	"./config"
+	"./events"
 	"./remoteeventcollector"
+	"./state"
 	"log"
+	"flag"
 )
 
 func EventPrinter() {
 	ch,_ := events.Subscribe("*");
 	go func(){
 		for evt := range ch {
-			log.Println(evt)
+			log.Println("EVENT: ",evt)
 		}
 	}()
 }
 
 func main() {
 	log.SetFlags(log.Ldate | log.Ltime | log.Lshortfile)
-	config.NewManager()
-	EventPrinter();
-	networking.StartTCPServer()
-	remoteeventcollector.New()
-	autodiscovery.Run()
+	flag.Parse()
+	
+	events.Go()
 
+	EventPrinter()
+	
+	state.Go()
+	config.Go()
+	apiserver.Go()
+	remoteeventcollector.Go()
+	autodiscovery.Go()
+	
 	select {}
 }

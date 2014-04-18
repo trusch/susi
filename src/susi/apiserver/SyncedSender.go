@@ -9,7 +9,7 @@
  * @author: Tino Rusch (tino.rusch@webvariants.de)
  */
 
-package networking
+package apiserver
 
 import (
 	"encoding/json"

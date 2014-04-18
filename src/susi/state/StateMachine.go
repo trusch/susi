@@ -68,88 +68,6 @@ func (sm *StateMachine) getObject(key string) (map[string]interface{},string,err
 
 var stateMachine *StateMachine
 
-func init() {
-	stateMachine = new(StateMachine)
-	stateMachine.maxListLen = 32
-	stateMachine.cmdChan = make(chan *command, 10)
-	stateMachine.state = make(map[string]interface{})
-	go func() {
-		for cmd := range stateMachine.cmdChan {
-			switch cmd.Type {
-			case SET:
-				{
-					obj,key,err := stateMachine.getObject(cmd.Key)
-					if err==nil {
-						obj[key] = cmd.Value
-						log.Print(stateMachine.state,key)
-					}else{
-						log.Print(err)
-					}
-				}
-			case GET:
-				{
-					obj,key,err := stateMachine.getObject(cmd.Key)
-					if err!=nil {
-						cmd.Return <- "Error: "+err.Error()
-					}else{
-						cmd.Return <- obj[key]
-					}
-				}
-			case PUSH,ENQUEUE:
-				{
-					old, ok := stateMachine.state[cmd.Key]
-					if !ok {
-						stateMachine.state[cmd.Key] = []interface{}{cmd.Value}
-					} else if arr,ok := old.([]interface{}); ok {
-						arr = append(arr, cmd.Value)
-						if stateMachine.maxListLen != 0 && len(arr) > stateMachine.maxListLen {
-							arr = arr[1:]
-						}
-						stateMachine.state[cmd.Key] = arr
-					} else {
-						arr := []interface{}{old,cmd.Value}
-						stateMachine.state[cmd.Key] = arr
-					}
-				}
-			case POP:
-				{
-					if arr_,ok := stateMachine.state[cmd.Key]; ok {
-						if arr,ok := arr_.([]interface{}); ok && len(arr)>=1 {
-							val := arr[len(arr)-1]
-							arr = arr[:len(arr)-1]
-							stateMachine.state[cmd.Key] = arr
-							cmd.Return <- val
-						}else{
-							cmd.Return <- arr_
-						}
-					}else{
-						cmd.Return <- nil
-					}
-				}
-			case DEQUEUE:
-				{
-					if arr_,ok := stateMachine.state[cmd.Key]; ok {
-						if arr,ok := arr_.([]interface{}); ok && len(arr)>=1{
-							val := arr[0]
-							arr = arr[1:]
-							stateMachine.state[cmd.Key] = arr
-							cmd.Return <- val
-						}else{
-							cmd.Return <- arr_
-						}
-					}else{
-						cmd.Return <- nil
-					}
-				}
-			case UNSET:
-				{
-					delete(stateMachine.state,cmd.Key)
-				}
-			}
-		}
-	}()
-	log.Print("successfully started StateMachine")
-}
 
 /*
 This sets a global variable
@@ -220,4 +138,87 @@ func Pop(key string) interface{} {
 
 func Print(){
 	log.Print(stateMachine.state)
+}
+
+func Go() {
+	stateMachine = new(StateMachine)
+	stateMachine.maxListLen = 32
+	stateMachine.cmdChan = make(chan *command, 10)
+	stateMachine.state = make(map[string]interface{})
+	go func() {
+		for cmd := range stateMachine.cmdChan {
+			switch cmd.Type {
+			case SET:
+				{
+					obj,key,err := stateMachine.getObject(cmd.Key)
+					if err==nil {
+						obj[key] = cmd.Value
+						//log.Print(cmd.Key)
+					}else{
+						log.Print(err)
+					}
+				}
+			case GET:
+				{
+					obj,key,err := stateMachine.getObject(cmd.Key)
+					if err!=nil {
+						cmd.Return <- "Error: "+err.Error()
+					}else{
+						cmd.Return <- obj[key]
+					}
+				}
+			case PUSH,ENQUEUE:
+				{
+					old, ok := stateMachine.state[cmd.Key]
+					if !ok {
+						stateMachine.state[cmd.Key] = []interface{}{cmd.Value}
+					} else if arr,ok := old.([]interface{}); ok {
+						arr = append(arr, cmd.Value)
+						if stateMachine.maxListLen != 0 && len(arr) > stateMachine.maxListLen {
+							arr = arr[1:]
+						}
+						stateMachine.state[cmd.Key] = arr
+					} else {
+						arr := []interface{}{old,cmd.Value}
+						stateMachine.state[cmd.Key] = arr
+					}
+				}
+			case POP:
+				{
+					if arr_,ok := stateMachine.state[cmd.Key]; ok {
+						if arr,ok := arr_.([]interface{}); ok && len(arr)>=1 {
+							val := arr[len(arr)-1]
+							arr = arr[:len(arr)-1]
+							stateMachine.state[cmd.Key] = arr
+							cmd.Return <- val
+						}else{
+							cmd.Return <- arr_
+						}
+					}else{
+						cmd.Return <- nil
+					}
+				}
+			case DEQUEUE:
+				{
+					if arr_,ok := stateMachine.state[cmd.Key]; ok {
+						if arr,ok := arr_.([]interface{}); ok && len(arr)>=1{
+							val := arr[0]
+							arr = arr[1:]
+							stateMachine.state[cmd.Key] = arr
+							cmd.Return <- val
+						}else{
+							cmd.Return <- arr_
+						}
+					}else{
+						cmd.Return <- nil
+					}
+				}
+			case UNSET:
+				{
+					delete(stateMachine.state,cmd.Key)
+				}
+			}
+		}
+	}()
+	log.Print("successfully started StateMachine")
 }

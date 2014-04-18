@@ -91,7 +91,53 @@ func (ptr *EventSystem) subscribe(topic string) (eventChannel chan interface{},c
 
 var eventSystem *EventSystem
 
-func init() {
+
+/*
+returns error when chanel is closed
+*/
+func safeSend(c chan interface{}, t interface{}) (err error) {
+	defer func() {
+		if x := recover(); x != nil {
+			err = errors.New("SendError")
+		}
+	}()
+	c <- t
+	return
+}
+
+/*
+Global publish function
+*/
+func Publish(topic string, payload interface{}) bool{
+	command := &command{
+		Type:    PUBLISH,
+		Topic:   topic,
+		Payload: payload,
+		Result:  make(chan interface{}),
+	}
+	eventSystem.cmdChan <- command
+	res := (<-command.Result).(bool)
+	return res
+}
+
+/*
+Global subscribe function
+*/
+func Subscribe(topic string) (eventChannel chan interface{},closeChannel chan bool) {
+	command := &command{
+		Type:    SUBSCRIBE,
+		Topic:   topic,
+		Result:  make(chan interface{}),
+	}
+	eventSystem.cmdChan <- command
+	res_ := <-command.Result
+	res := res_.(unsubscribeResult)
+	eventChannel = res.EventChan
+	closeChannel = res.CloseChan
+	return
+}
+
+func Go() {
 	eventSystem = new(EventSystem)
 	eventSystem.cmdChan = make(chan *command, 10)
 	eventSystem.topics = make(map[string]map[int64]chan interface{})
@@ -142,49 +188,3 @@ func init() {
 	}()
 	log.Print("successfully started EventSystem")
 }
-
-/*
-returns error when chanel is closed
-*/
-func safeSend(c chan interface{}, t interface{}) (err error) {
-	defer func() {
-		if x := recover(); x != nil {
-			err = errors.New("SendError")
-		}
-	}()
-	c <- t
-	return
-}
-
-/*
-Global publish function
-*/
-func Publish(topic string, payload interface{}) bool{
-	command := &command{
-		Type:    PUBLISH,
-		Topic:   topic,
-		Payload: payload,
-		Result:  make(chan interface{}),
-	}
-	eventSystem.cmdChan <- command
-	res := (<-command.Result).(bool)
-	return res
-}
-
-/*
-Global subscribe function
-*/
-func Subscribe(topic string) (eventChannel chan interface{},closeChannel chan bool) {
-	command := &command{
-		Type:    SUBSCRIBE,
-		Topic:   topic,
-		Result:  make(chan interface{}),
-	}
-	eventSystem.cmdChan <- command
-	res_ := <-command.Result
-	res := res_.(unsubscribeResult)
-	eventChannel = res.EventChan
-	closeChannel = res.CloseChan
-	return
-}
-

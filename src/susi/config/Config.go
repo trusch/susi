@@ -34,6 +34,9 @@ func (ptr *ConfigManager) LoadFileToState(filename string) error {
 		return err
 	}
 	defer f.Close()
+	basekey := strings.Replace(filename,"/",".",-1)
+	lastDot := strings.LastIndex(basekey,".")
+	basekey = basekey[:lastDot]
 	decoder := json.NewDecoder(f)
 	data := make(map[string]interface{})
 	err = decoder.Decode(&data)
@@ -42,8 +45,8 @@ func (ptr *ConfigManager) LoadFileToState(filename string) error {
 		return err
 	}
 	for key,val := range data {
-		log.Print("load config: ",key," : ",val)
-		state.Set(key,val)
+		log.Print("load config: ",basekey+"."+key," : ",val)
+		state.Set(basekey+"."+key,val)
 	}
 	return nil
 }
@@ -77,7 +80,7 @@ func (ptr *ConfigManager) LoadFlags(){
 	})
 }
 
-func NewManager() *ConfigManager{
+func Go(){
 	ptr := new(ConfigManager)
 	ptr.modifiedTimes = make(map[string]time.Time)
 	ch := make(chan bool)
@@ -96,5 +99,4 @@ func NewManager() *ConfigManager{
 		}
 	}()
 	<-ch
-	return ptr
 }

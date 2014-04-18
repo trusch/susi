@@ -61,11 +61,6 @@ func (ptr *AutodiscoveryManager) backend(){
 	}
 }
 
-func NewAutodiscoveryManager() *AutodiscoveryManager{
-	res := new(AutodiscoveryManager)
-	go res.backend();
-	return res
-}
 
 
 func (ptr *AutodiscoveryManager) GetOwnAddr(ownPort string) string {
@@ -224,7 +219,13 @@ func (ptr *AutodiscoveryManager) SendDirectMessage(addr, msg string){
 	}()
 }
 
-func Run(){
+func NewAutodiscoveryManager() *AutodiscoveryManager{
+	res := new(AutodiscoveryManager)
+	go res.backend();
+	return res
+}
+
+func Go(){
 	flag.Parse()
 	NewAutodiscoveryManager()	
 }

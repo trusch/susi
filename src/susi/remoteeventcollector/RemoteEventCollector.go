@@ -13,7 +13,7 @@ package remoteeventcollector
 
 import(
 	"../events"
-	"../networking"
+	"../apiserver"
 	"net"
 	"encoding/json"
 	"log"
@@ -29,7 +29,7 @@ type RemoteEventCollector struct {
 func (ptr *RemoteEventCollector) HandleAwnsers(conn net.Conn) {
 	defer conn.Close()
 	decoder := json.NewDecoder(conn)
-	msg := new(networking.ApiMessage)	
+	msg := new(apiserver.ApiMessage)	
 	for {
 		if err := decoder.Decode(&msg); err!=nil {
 			log.Print(err)
@@ -57,7 +57,7 @@ func (ptr *RemoteEventCollector) ConnectToHost(addr string){
 	go ptr.HandleAwnsers(conn)
 	encoder := json.NewEncoder(conn)
 	for _,name := range ptr.OwnNames {
-		msg := new(networking.ApiMessage)
+		msg := new(apiserver.ApiMessage)
 		msg.Type = "subscribe"
 		msg.Data.Key = "*@"+name 
 		err = encoder.Encode(msg)
@@ -68,7 +68,7 @@ func (ptr *RemoteEventCollector) ConnectToHost(addr string){
 	}
 }
 
-func New() *RemoteEventCollector {
+func Go() {
 	ptr := new(RemoteEventCollector)
 	ptr.OwnNames = []string{"all"}
 	hCh,_ := events.Subscribe("hosts::new");
@@ -79,5 +79,5 @@ func New() *RemoteEventCollector {
 			go ptr.ConnectToHost(hostAddr);
 		}
 	}()
-	return ptr
+	return
 }

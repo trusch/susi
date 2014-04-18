@@ -9,7 +9,7 @@
  * @author: Tino Rusch (tino.rusch@webvariants.de)
  */
 
-package networking
+package apiserver
 
 import (
 	"../events"
@@ -205,7 +205,7 @@ func HandleConnection(conn net.Conn) {
 	}
 }
 
-func StartTCPServer() error {
+func Go() {
 	portStr := state.Get("apiserver.tcpPort").(string)
 	listener, err := net.Listen("tcp", ":"+portStr)
 	if err != nil {
@@ -222,6 +222,6 @@ func StartTCPServer() error {
 		}
 	}()
 	log.Print("successfully started susi api server on ",listener.Addr())
-	return nil
+	return
 }
 
