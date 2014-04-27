@@ -47,7 +47,9 @@ func (ptr *AutodiscoveryManager) backend(){
 						continue
 					}
 					ptr.Hosts[addr] = true
-					events.Publish("hosts::new",addr);
+					event := events.NewEvent("hosts::new",addr)
+					event.AuthLevel = 0
+					events.Publish(event);
 				}
 			}
 			case addr := <-ptr.InputLost: {
@@ -55,7 +57,9 @@ func (ptr *AutodiscoveryManager) backend(){
 					continue
 				}
 				delete(ptr.Hosts,addr)
-				events.Publish("hosts::lost",addr);	
+				event := events.NewEvent("hosts::lost",addr)
+				event.AuthLevel = 0
+				events.Publish(event);	
 			}
 		}
 	}
@@ -133,15 +137,14 @@ func (ptr *AutodiscoveryManager) ListenForDirectMessage(){
 		for {
 			conn,err := accp.Accept()
 			if err!=nil {
-				//log.Println(err)
 				return
 			}else{
+				//Got a direct message
 				go func(){
 					defer conn.Close()
 					buff := make([]byte, 4096)
 					bs,err := conn.Read(buff)
 					if err!=nil {
-						//log.Println(err)
 						return
 					}
 					hostAddr := string(buff[:bs])
@@ -150,14 +153,16 @@ func (ptr *AutodiscoveryManager) ListenForDirectMessage(){
 					for {
 						bs,err := conn.Read(buff)
 						if err!=nil {
-							//log.Println(err)
-							events.Publish("hosts::lost",hostAddr);
+							event := events.NewEvent("hosts::lost",hostAddr)
+							event.AuthLevel = 0
+							events.Publish(event);
 							return
 						}
 						_,err = conn.Write(buff[:bs])
 						if err!=nil {
-							//log.Println(err)
-							events.Publish("hosts::lost",hostAddr);
+							event := events.NewEvent("hosts::lost",hostAddr)
+							event.AuthLevel = 0
+							events.Publish(event);
 							return
 						}
 					}

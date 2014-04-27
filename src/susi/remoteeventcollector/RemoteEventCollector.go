@@ -42,7 +42,9 @@ func (ptr *RemoteEventCollector) HandleAwnsers(conn net.Conn) {
 			case "event": { 
 				parts := strings.Split(msg.Data.Key,"@")
 				key := parts[0]
-				events.Publish(key,msg.Data.Payload)
+				event := events.NewEvent(key,msg.Data.Payload)
+				event.AuthLevel = msg.AuthLevel
+				events.Publish(event)
 			}
 		}
 	}
@@ -71,11 +73,10 @@ func (ptr *RemoteEventCollector) ConnectToHost(addr string){
 func Go() {
 	ptr := new(RemoteEventCollector)
 	ptr.OwnNames = []string{"all"}
-	hCh,_ := events.Subscribe("hosts::new");
-	ptr.NewHostChan = hCh
+	newHostChan,_ := events.Subscribe("hosts::new",0);
 	go func(){
-		for event := range ptr.NewHostChan {
-			hostAddr := event.(string)
+		for event := range newHostChan {
+			hostAddr := event.Payload.(string)
 			go ptr.ConnectToHost(hostAddr);
 		}
 	}()

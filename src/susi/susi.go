@@ -5,7 +5,7 @@
  * complete text in the attached LICENSE file or online at:
  *
  * http://www.opensource.org/licenses/mit-license.php
- * 
+ *
  * @author: Tino Rusch (tino.rusch@webvariants.de)
  */
 
@@ -18,15 +18,15 @@ import (
 	"./events"
 	"./remoteeventcollector"
 	"./state"
-	"log"
 	"flag"
+	"log"
 )
 
 func EventPrinter() {
-	ch,_ := events.Subscribe("*");
-	go func(){
+	ch, _ := events.Subscribe("*", 0)
+	go func() {
 		for evt := range ch {
-			log.Println("EVENT: ",evt)
+			log.Println("EVENT: ", evt)
 		}
 	}()
 }
@@ -34,16 +34,16 @@ func EventPrinter() {
 func main() {
 	log.SetFlags(log.Ldate | log.Ltime | log.Lshortfile)
 	flag.Parse()
-	
+
 	events.Go()
 
 	EventPrinter()
-	
+
 	state.Go()
 	config.Go()
 	apiserver.Go()
 	remoteeventcollector.Go()
 	autodiscovery.Go()
-	
+
 	select {}
 }

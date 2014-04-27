@@ -5,7 +5,7 @@
  * complete text in the attached LICENSE file or online at:
  *
  * http://www.opensource.org/licenses/mit-license.php
- * 
+ *
  * @author: Tino Rusch (tino.rusch@webvariants.de)
  */
 
@@ -14,13 +14,33 @@ package apiserver
 import (
 	"../events"
 	"../state"
+	"crypto/tls"
 	"encoding/json"
+	"flag"
 	"log"
 	"net"
-	"flag"
 )
 
-var apiTcpPort = flag.String("apiserver.tcpPort","4242","The port of the susi api server")
+var apiTcpPort = flag.String("apiserver.tcpPort", "4000", "The port of the susi api server")
+var apiTlsPort = flag.String("apiserver.tls.port", "4001", "The port of the susi api server")
+var apiCertFile = flag.String("apiserver.tls.certificate", "", "The certificate to use in the api server")
+var apiKeyFile = flag.String("apiserver.tls.key", "", "The key to use in the api server")
+
+type ApiMessage struct {
+	Id        int64  `json:"id,omitempty"`
+	AuthLevel uint8  `json:"authlevel,omitempty"`
+	Type      string `json:"type"`
+	Data      struct {
+		Key     string      `json:"key"`
+		Payload interface{} `json:"payload"`
+	} `json:"data"`
+}
+
+func NewApiMessage() *ApiMessage {
+	msg := new(ApiMessage)
+	msg.AuthLevel = 255
+	return msg
+}
 
 type subscribtionsType map[string]chan bool
 
@@ -39,7 +59,8 @@ func NewConnection(conn net.Conn) *Connection {
 }
 
 func (conn *Connection) sendStatusMessage(id int64, key, msg string) {
-	packet := new(ApiMessage)
+	packet := NewApiMessage()
+	packet.AuthLevel = 0
 	packet.Id = id
 	packet.Type = "status"
 	packet.Data.Key = key
@@ -50,7 +71,7 @@ func (conn *Connection) sendStatusMessage(id int64, key, msg string) {
 func (conn *Connection) subscribe(req *ApiMessage) {
 	topic := req.Data.Key
 	if _, ok := conn.subscribtions[topic]; !ok {
-		eventChan, unsubscribeChan := events.Subscribe(topic)
+		eventChan, unsubscribeChan := events.Subscribe(topic, req.AuthLevel)
 		closeChan := make(chan bool)
 		conn.subscribtions[topic] = closeChan
 		go func() {
@@ -61,19 +82,12 @@ func (conn *Connection) subscribe(req *ApiMessage) {
 				select {
 				case event := <-eventChan:
 					{
-						resp := new(ApiMessage)
+						resp := NewApiMessage()
+						resp.AuthLevel = event.AuthLevel
 						resp.Id = req.Id
 						resp.Type = "event"
-						resp.Data.Key = topic
-						resp.Data.Payload = event
-						if evt,ok := event.(map[string]interface{}); ok {
-							if topic,ok = evt["topic"].(string);ok {
-								resp.Data.Key = topic
-								if pay,ok := evt["payload"]; ok {
-									resp.Data.Payload = pay
-								}
-							}
-						}
+						resp.Data.Key = event.Topic
+						resp.Data.Payload = event.Payload
 						err := conn.sender.Send(resp)
 						if err != nil {
 							log.Print(err)
@@ -87,9 +101,9 @@ func (conn *Connection) subscribe(req *ApiMessage) {
 				}
 			}
 		}()
-		conn.sendStatusMessage(req.Id,"ok", "successfully subscribed to "+topic)
+		conn.sendStatusMessage(req.Id, "ok", "successfully subscribed to "+topic)
 	} else {
-		conn.sendStatusMessage(req.Id,"error", "you are allready subscribed to "+topic)
+		conn.sendStatusMessage(req.Id, "error", "you are allready subscribed to "+topic)
 		log.Print("allready subscribed to topic ", topic)
 	}
 }
@@ -99,23 +113,14 @@ func (conn *Connection) unsubscribe(req *ApiMessage) {
 	if ch, ok := conn.subscribtions[topic]; ok {
 		ch <- true
 		delete(conn.subscribtions, topic)
-		conn.sendStatusMessage(req.Id,"ok", "successfully unsubscribed from "+topic)
+		conn.sendStatusMessage(req.Id, "ok", "successfully unsubscribed from "+topic)
 	} else {
-		conn.sendStatusMessage(req.Id,"error", "you are not subscribed to "+topic)
+		conn.sendStatusMessage(req.Id, "error", "you are not subscribed to "+topic)
 		log.Print("not subscribed to topic ", topic)
 	}
 }
 
-type ApiMessage struct {
-	Id   int64  `json:"id,omitempty"`
-	Type string `json:"type"`
-	Data struct {
-		Key     string      `json:"key"`
-		Payload interface{} `json:"payload"`
-	} `json:"data"`
-}
-
-func HandleConnection(conn net.Conn) {
+func HandleConnection(conn net.Conn, authlevel uint8) {
 	connection := NewConnection(conn)
 	defer func() {
 		for _, ch := range connection.subscribtions {
@@ -129,8 +134,11 @@ func HandleConnection(conn net.Conn) {
 		req := ApiMessage{}
 		err := decoder.Decode(&req)
 		if err != nil {
-			log.Print(err)
+			log.Print("lost connection or parse error: ",err)
 			return
+		}
+		if req.AuthLevel < authlevel {
+			req.AuthLevel = authlevel
 		}
 		switch req.Type {
 		case "subscribe":
@@ -143,23 +151,25 @@ func HandleConnection(conn net.Conn) {
 			}
 		case "publish":
 			{
-				events.Publish(req.Data.Key, req.Data.Payload)
-				connection.sendStatusMessage(req.Id,"ok", "successfully published event to "+req.Data.Key)
+				event := events.NewEvent(req.Data.Key, req.Data.Payload)
+				event.AuthLevel = req.AuthLevel
+				events.Publish(event)
+				connection.sendStatusMessage(req.Id, "ok", "successfully published event to "+req.Data.Key)
 			}
 		case "set":
 			{
-				state.Set(req.Data.Key,req.Data.Payload)
-				connection.sendStatusMessage(req.Id,"ok", "successfully saved data to "+req.Data.Key)
+				state.Set(req.Data.Key, req.Data.Payload)
+				connection.sendStatusMessage(req.Id, "ok", "successfully saved data to "+req.Data.Key)
 			}
 		case "push":
 			{
-				state.Push(req.Data.Key,req.Data.Payload)
-				connection.sendStatusMessage(req.Id,"ok", "successfully pushed data to "+req.Data.Key)
+				state.Push(req.Data.Key, req.Data.Payload)
+				connection.sendStatusMessage(req.Id, "ok", "successfully pushed data to "+req.Data.Key)
 			}
 		case "enqueue":
 			{
-				state.Enqueue(req.Data.Key,req.Data.Payload)
-				connection.sendStatusMessage(req.Id,"ok", "successfully queued data to "+req.Data.Key)
+				state.Enqueue(req.Data.Key, req.Data.Payload)
+				connection.sendStatusMessage(req.Id, "ok", "successfully queued data to "+req.Data.Key)
 			}
 		case "get":
 			{
@@ -194,11 +204,11 @@ func HandleConnection(conn net.Conn) {
 		case "unset":
 			{
 				state.Unset(req.Data.Key)
-				connection.sendStatusMessage(req.Id,"ok", "successfully unset data from "+req.Data.Key)
+				connection.sendStatusMessage(req.Id, "ok", "successfully unset data from "+req.Data.Key)
 			}
 		default:
 			{
-				connection.sendStatusMessage(req.Id,"error", "no such request type: "+req.Type)	
+				connection.sendStatusMessage(req.Id, "error", "no such request type: "+req.Type)
 			}
 		}
 		// fmt.Println("Request: ",req)
@@ -207,6 +217,59 @@ func HandleConnection(conn net.Conn) {
 
 func Go() {
 	portStr := state.Get("apiserver.tcpPort").(string)
+	tlsPortStr := state.Get("apiserver.tls.port").(string)
+	certStr := state.Get("apiserver.tls.certificate").(string)
+	keyStr := state.Get("apiserver.tls.key").(string)
+
+
+	if certStr != "" && keyStr != "" {
+		cert, err := tls.LoadX509KeyPair(certStr, keyStr)
+		if err != nil {
+			log.Fatal(err)
+		}
+		config := &tls.Config{
+			Certificates: []tls.Certificate{cert},
+			ClientAuth:   tls.RequireAnyClientCert,
+		}
+
+		listener, err := tls.Listen("tcp", ":"+tlsPortStr, config)
+		if err != nil {
+			log.Fatal(err)
+		}
+		go func() {
+			for {
+				conn, err := listener.Accept()
+				if err != nil {
+					log.Print(err)
+					continue
+				}
+				tlsConn := conn.(*tls.Conn)
+				err = tlsConn.Handshake()
+				if err != nil {
+					log.Print(err)
+					continue
+				}
+				peerCert := tlsConn.ConnectionState().PeerCertificates[0].Raw
+				myCert := cert.Certificate[0]
+				peerCertIsMyCert := true
+				if len(peerCert) == len(myCert) {
+					for idx, chr := range peerCert {
+						if chr != myCert[idx] {
+							peerCertIsMyCert = false
+							break
+						}
+					}
+				}
+				if peerCertIsMyCert {
+					go HandleConnection(conn, 0)
+				} else {
+					go HandleConnection(conn, 1)
+				}
+			}
+		}()
+		log.Print("successfully started susi tls api server on ", listener.Addr())
+	}
+
 	listener, err := net.Listen("tcp", ":"+portStr)
 	if err != nil {
 		log.Fatal(err)
@@ -218,10 +281,9 @@ func Go() {
 				log.Print(err)
 				continue
 			}
-			go HandleConnection(conn)
+			go HandleConnection(conn, 2)
 		}
 	}()
-	log.Print("successfully started susi api server on ",listener.Addr())
+	log.Print("successfully started susi api server on ", listener.Addr())
 	return
 }
-
