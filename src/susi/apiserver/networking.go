@@ -249,14 +249,16 @@ func Go() {
 					log.Print(err)
 					continue
 				}
-				peerCert := tlsConn.ConnectionState().PeerCertificates[0].Raw
 				myCert := cert.Certificate[0]
 				peerCertIsMyCert := true
-				if len(peerCert) == len(myCert) {
-					for idx, chr := range peerCert {
-						if chr != myCert[idx] {
-							peerCertIsMyCert = false
-							break
+				if certs := tlsConn.ConnectionState().PeerCertificates; len(certs)>0 {
+					peerCert := certs[0].Raw
+					if len(peerCert) == len(myCert) {
+						for idx, chr := range peerCert {
+							if chr != myCert[idx] {
+								peerCertIsMyCert = false
+								break
+							}
 						}
 					}
 				}
