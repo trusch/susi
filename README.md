@@ -9,10 +9,9 @@ Structure:
 {
   "id" : 123,
   "type": "publish",
-  "data": {
-    "key": "topicname",
-    "payload": {"some":"data"}
-  }
+  "key": "topicname",
+  "authlevel" : 0,
+  "payload": {"some":"data"}
 }
 
 possible types:
