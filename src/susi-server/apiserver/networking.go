@@ -21,19 +21,17 @@ import (
 	"net"
 )
 
-var apiTcpPort = flag.String("apiserver.tcpPort", "4000", "The port of the susi api server")
+var apiTcpPort = flag.String("apiserver.port", "4000", "The port of the susi api server")
 var apiTlsPort = flag.String("apiserver.tls.port", "4001", "The port of the susi api server")
-var apiCertFile = flag.String("apiserver.tls.certificate", "", "The certificate to use in the api server")
+var apiCertFile = flag.String("apiserver.tls.cert", "", "The certificate to use in the api server")
 var apiKeyFile = flag.String("apiserver.tls.key", "", "The key to use in the api server")
 
 type ApiMessage struct {
-	Id        int64  `json:"id,omitempty"`
-	AuthLevel uint8  `json:"authlevel,omitempty"`
-	Type      string `json:"type"`
-	Data      struct {
-		Key     string      `json:"key"`
-		Payload interface{} `json:"payload"`
-	} `json:"data"`
+	Id        int64       `json:"id,omitempty"`
+	AuthLevel uint8       `json:"authlevel,omitempty"`
+	Type      string      `json:"type"`
+	Key       string      `json:"key"`
+	Payload   interface{} `json:"payload,omitempty"`
 }
 
 func NewApiMessage() *ApiMessage {
@@ -63,13 +61,13 @@ func (conn *Connection) sendStatusMessage(id int64, key, msg string) {
 	packet.AuthLevel = 0
 	packet.Id = id
 	packet.Type = "status"
-	packet.Data.Key = key
-	packet.Data.Payload = msg
+	packet.Key = key
+	packet.Payload = msg
 	conn.sender.Send(packet)
 }
 
 func (conn *Connection) subscribe(req *ApiMessage) {
-	topic := req.Data.Key
+	topic := req.Key
 	if _, ok := conn.subscribtions[topic]; !ok {
 		eventChan, unsubscribeChan := events.Subscribe(topic, req.AuthLevel)
 		closeChan := make(chan bool)
@@ -86,8 +84,8 @@ func (conn *Connection) subscribe(req *ApiMessage) {
 						resp.AuthLevel = event.AuthLevel
 						resp.Id = req.Id
 						resp.Type = "event"
-						resp.Data.Key = event.Topic
-						resp.Data.Payload = event.Payload
+						resp.Key = event.Topic
+						resp.Payload = event.Payload
 						err := conn.sender.Send(resp)
 						if err != nil {
 							log.Print(err)
@@ -109,7 +107,7 @@ func (conn *Connection) subscribe(req *ApiMessage) {
 }
 
 func (conn *Connection) unsubscribe(req *ApiMessage) {
-	topic := req.Data.Key
+	topic := req.Key
 	if ch, ok := conn.subscribtions[topic]; ok {
 		ch <- true
 		delete(conn.subscribtions, topic)
@@ -151,60 +149,60 @@ func HandleConnection(conn net.Conn, authlevel uint8) {
 			}
 		case "publish":
 			{
-				event := events.NewEvent(req.Data.Key, req.Data.Payload)
+				event := events.NewEvent(req.Key, req.Payload)
 				event.AuthLevel = req.AuthLevel
 				events.Publish(event)
-				connection.sendStatusMessage(req.Id, "ok", "successfully published event to "+req.Data.Key)
+				connection.sendStatusMessage(req.Id, "ok", "successfully published event to "+req.Key)
 			}
 		case "set":
 			{
-				state.Set(req.Data.Key, req.Data.Payload)
-				connection.sendStatusMessage(req.Id, "ok", "successfully saved data to "+req.Data.Key)
+				state.Set(req.Key, req.Payload)
+				connection.sendStatusMessage(req.Id, "ok", "successfully saved data to "+req.Key)
 			}
 		case "push":
 			{
-				state.Push(req.Data.Key, req.Data.Payload)
-				connection.sendStatusMessage(req.Id, "ok", "successfully pushed data to "+req.Data.Key)
+				state.Push(req.Key, req.Payload)
+				connection.sendStatusMessage(req.Id, "ok", "successfully pushed data to "+req.Key)
 			}
 		case "enqueue":
 			{
-				state.Enqueue(req.Data.Key, req.Data.Payload)
-				connection.sendStatusMessage(req.Id, "ok", "successfully queued data to "+req.Data.Key)
+				state.Enqueue(req.Key, req.Payload)
+				connection.sendStatusMessage(req.Id, "ok", "successfully queued data to "+req.Key)
 			}
 		case "get":
 			{
-				data := state.Get(req.Data.Key)
+				data := state.Get(req.Key)
 				packet := new(ApiMessage)
 				packet.Id = req.Id
 				packet.Type = "response"
-				packet.Data.Key = req.Data.Key
-				packet.Data.Payload = data
+				packet.Key = req.Key
+				packet.Payload = data
 				connection.sender.Send(packet)
 			}
 		case "pop":
 			{
-				data := state.Pop(req.Data.Key)
+				data := state.Pop(req.Key)
 				packet := new(ApiMessage)
 				packet.Id = req.Id
 				packet.Type = "response"
-				packet.Data.Key = req.Data.Key
-				packet.Data.Payload = data
+				packet.Key = req.Key
+				packet.Payload = data
 				connection.sender.Send(packet)
 			}
 		case "dequeue":
 			{
-				data := state.Dequeue(req.Data.Key)
+				data := state.Dequeue(req.Key)
 				packet := new(ApiMessage)
 				packet.Id = req.Id
 				packet.Type = "response"
-				packet.Data.Key = req.Data.Key
-				packet.Data.Payload = data
+				packet.Key = req.Key
+				packet.Payload = data
 				connection.sender.Send(packet)
 			}
 		case "unset":
 			{
-				state.Unset(req.Data.Key)
-				connection.sendStatusMessage(req.Id, "ok", "successfully unset data from "+req.Data.Key)
+				state.Unset(req.Key)
+				connection.sendStatusMessage(req.Id, "ok", "successfully unset data from "+req.Key)
 			}
 		default:
 			{
@@ -216,9 +214,9 @@ func HandleConnection(conn net.Conn, authlevel uint8) {
 }
 
 func Go() {
-	portStr := state.Get("apiserver.tcpPort").(string)
+	portStr := state.Get("apiserver.port").(string)
 	tlsPortStr := state.Get("apiserver.tls.port").(string)
-	certStr := state.Get("apiserver.tls.certificate").(string)
+	certStr := state.Get("apiserver.tls.cert").(string)
 	keyStr := state.Get("apiserver.tls.key").(string)
 
 	if certStr != "" && keyStr != "" {

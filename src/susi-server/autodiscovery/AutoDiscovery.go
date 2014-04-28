@@ -21,8 +21,8 @@ import (
 	"time"
 )
 
-var autodiscoveryMulticastPort = flag.String("autodiscovery.mcastPort", "42424", "the autodiscovery multicast port")
-var autodiscoveryTcpPort = flag.String("autodiscovery.tcpPort", "42424", "the autodiscovery tcp port")
+var autodiscoveryMulticastAddr = flag.String("autodiscovery.mcastAddr", "224.0.0.23:42424", "the autodiscovery multicast addr")
+var autodiscoveryTcpPort = flag.String("autodiscovery.port", "42424", "the autodiscovery tcp port")
 
 type AutodiscoveryManager struct {
 	InputNew  chan string
@@ -36,8 +36,8 @@ func (ptr *AutodiscoveryManager) backend() {
 	ptr.Hosts = make(map[string]bool)
 	ptr.ListenForMulticastMessage()
 	ptr.ListenForDirectMessage()
-	own := ptr.GetOwnAddr(state.Get("apiserver.tcpPort").(string))
-	ptr.SendMulticastMessage(ptr.GetOwnAddr(state.Get("autodiscovery.tcpPort").(string)))
+	own := ptr.GetOwnAddr(state.Get("apiserver.port").(string))
+	ptr.SendMulticastMessage(ptr.GetOwnAddr(state.Get("autodiscovery.port").(string)))
 
 	for {
 		select {
@@ -96,10 +96,10 @@ OUTERLOOP:
 }
 
 func (ptr *AutodiscoveryManager) ListenForMulticastMessage() {
-	ownApiAddr := ptr.GetOwnAddr(state.Get("apiserver.tcpPort").(string))
-	ownDiscoveryAddr := ptr.GetOwnAddr(state.Get("autodiscovery.tcpPort").(string))
+	ownApiAddr := ptr.GetOwnAddr(state.Get("apiserver.port").(string))
+	ownDiscoveryAddr := ptr.GetOwnAddr(state.Get("autodiscovery.port").(string))
 
-	mcaddr, err := net.ResolveUDPAddr("udp", "224.0.0.23:"+state.Get("autodiscovery.mcastPort").(string))
+	mcaddr, err := net.ResolveUDPAddr("udp",state.Get("autodiscovery.mcastAddr").(string))
 	if err != nil {
 		//log.Println(err)
 		return
@@ -127,8 +127,8 @@ func (ptr *AutodiscoveryManager) ListenForMulticastMessage() {
 }
 
 func (ptr *AutodiscoveryManager) ListenForDirectMessage() {
-	ownAddr := ptr.GetOwnAddr(state.Get("apiserver.tcpPort").(string))
-	accp, err := net.Listen("tcp", ":"+state.Get("autodiscovery.tcpPort").(string))
+	ownAddr := ptr.GetOwnAddr(state.Get("apiserver.port").(string))
+	accp, err := net.Listen("tcp", ":"+state.Get("autodiscovery.port").(string))
 	if err != nil {
 		log.Println(err)
 		return
@@ -173,8 +173,8 @@ func (ptr *AutodiscoveryManager) ListenForDirectMessage() {
 }
 
 func (ptr *AutodiscoveryManager) SendMulticastMessage(msg string) {
-	portStr := state.Get("autodiscovery.mcastPort").(string)
-	conn, err := net.Dial("udp", "224.0.0.23:"+portStr)
+	addr := state.Get("autodiscovery.mcastAddr").(string)
+	conn, err := net.Dial("udp", addr)
 	if err != nil {
 		log.Println(err)
 		return

@@ -38,13 +38,13 @@ func (ptr *RemoteEventCollector) HandleAwnsers(conn net.Conn) {
 		switch msg.Type {
 		case "status":
 			{
-				log.Print(msg.Data.Payload)
+				log.Print(msg.Payload)
 			}
 		case "event":
 			{
-				parts := strings.Split(msg.Data.Key, "@")
+				parts := strings.Split(msg.Key, "@")
 				key := parts[0]
-				event := events.NewEvent(key, msg.Data.Payload)
+				event := events.NewEvent(key, msg.Payload)
 				event.AuthLevel = msg.AuthLevel
 				events.Publish(event)
 			}
@@ -63,7 +63,7 @@ func (ptr *RemoteEventCollector) ConnectToHost(addr string) {
 	for _, name := range ptr.OwnNames {
 		msg := new(apiserver.ApiMessage)
 		msg.Type = "subscribe"
-		msg.Data.Key = "*@" + name
+		msg.Key = "*@" + name
 		err = encoder.Encode(msg)
 		if err != nil {
 			log.Print(err)
