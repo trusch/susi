@@ -5,16 +5,16 @@
  * complete text in the attached LICENSE file or online at:
  *
  * http://www.opensource.org/licenses/mit-license.php
- * 
+ *
  * @author: Tino Rusch (tino.rusch@webvariants.de)
  */
 
 package state
 
 import (
+	"errors"
 	"log"
 	"strings"
-	"errors"
 )
 
 const (
@@ -44,30 +44,29 @@ type StateMachine struct {
 	maxListLen int
 }
 
-func (sm *StateMachine) getObject(key string) (map[string]interface{},string,error) {
-	parts := strings.Split(key,".")
-	if len(parts)==1 {
-		return sm.state,key,nil
+func (sm *StateMachine) getObject(key string) (map[string]interface{}, string, error) {
+	parts := strings.Split(key, ".")
+	if len(parts) == 1 {
+		return sm.state, key, nil
 	}
 	curObj := sm.state
-	for i:=0;i<len(parts)-1;i++ {
-		if nextObj,ok := curObj[parts[i]]; !ok {
+	for i := 0; i < len(parts)-1; i++ {
+		if nextObj, ok := curObj[parts[i]]; !ok {
 			nextObj := make(map[string]interface{})
 			curObj[parts[i]] = nextObj
-			curObj = nextObj	
-		}else{
-			if obj,ok := nextObj.(map[string]interface{}); !ok {
-				return nil,"",errors.New("key collision")
-			}else{
+			curObj = nextObj
+		} else {
+			if obj, ok := nextObj.(map[string]interface{}); !ok {
+				return nil, "", errors.New("key collision")
+			} else {
 				curObj = obj
 			}
 		}
 	}
-	return curObj,parts[len(parts)-1],nil
+	return curObj, parts[len(parts)-1], nil
 }
 
 var stateMachine *StateMachine
-
 
 /*
 This sets a global variable
@@ -95,8 +94,8 @@ func Get(key string) interface{} {
 
 func Unset(key string) {
 	stateMachine.cmdChan <- &command{
-		Type:  UNSET,
-		Key:   key,
+		Type: UNSET,
+		Key:  key,
 	}
 }
 
@@ -136,7 +135,7 @@ func Pop(key string) interface{} {
 	return <-cmd.Return
 }
 
-func Print(){
+func Print() {
 	log.Print(stateMachine.state)
 }
 
@@ -150,72 +149,72 @@ func Go() {
 			switch cmd.Type {
 			case SET:
 				{
-					obj,key,err := stateMachine.getObject(cmd.Key)
-					if err==nil {
+					obj, key, err := stateMachine.getObject(cmd.Key)
+					if err == nil {
 						obj[key] = cmd.Value
 						//log.Print(cmd.Key)
-					}else{
+					} else {
 						log.Print(err)
 					}
 				}
 			case GET:
 				{
-					obj,key,err := stateMachine.getObject(cmd.Key)
-					if err!=nil {
-						cmd.Return <- "Error: "+err.Error()
-					}else{
+					obj, key, err := stateMachine.getObject(cmd.Key)
+					if err != nil {
+						cmd.Return <- "Error: " + err.Error()
+					} else {
 						cmd.Return <- obj[key]
 					}
 				}
-			case PUSH,ENQUEUE:
+			case PUSH, ENQUEUE:
 				{
 					old, ok := stateMachine.state[cmd.Key]
 					if !ok {
 						stateMachine.state[cmd.Key] = []interface{}{cmd.Value}
-					} else if arr,ok := old.([]interface{}); ok {
+					} else if arr, ok := old.([]interface{}); ok {
 						arr = append(arr, cmd.Value)
 						if stateMachine.maxListLen != 0 && len(arr) > stateMachine.maxListLen {
 							arr = arr[1:]
 						}
 						stateMachine.state[cmd.Key] = arr
 					} else {
-						arr := []interface{}{old,cmd.Value}
+						arr := []interface{}{old, cmd.Value}
 						stateMachine.state[cmd.Key] = arr
 					}
 				}
 			case POP:
 				{
-					if arr_,ok := stateMachine.state[cmd.Key]; ok {
-						if arr,ok := arr_.([]interface{}); ok && len(arr)>=1 {
+					if arr_, ok := stateMachine.state[cmd.Key]; ok {
+						if arr, ok := arr_.([]interface{}); ok && len(arr) >= 1 {
 							val := arr[len(arr)-1]
 							arr = arr[:len(arr)-1]
 							stateMachine.state[cmd.Key] = arr
 							cmd.Return <- val
-						}else{
+						} else {
 							cmd.Return <- arr_
 						}
-					}else{
+					} else {
 						cmd.Return <- nil
 					}
 				}
 			case DEQUEUE:
 				{
-					if arr_,ok := stateMachine.state[cmd.Key]; ok {
-						if arr,ok := arr_.([]interface{}); ok && len(arr)>=1{
+					if arr_, ok := stateMachine.state[cmd.Key]; ok {
+						if arr, ok := arr_.([]interface{}); ok && len(arr) >= 1 {
 							val := arr[0]
 							arr = arr[1:]
 							stateMachine.state[cmd.Key] = arr
 							cmd.Return <- val
-						}else{
+						} else {
 							cmd.Return <- arr_
 						}
-					}else{
+					} else {
 						cmd.Return <- nil
 					}
 				}
 			case UNSET:
 				{
-					delete(stateMachine.state,cmd.Key)
+					delete(stateMachine.state, cmd.Key)
 				}
 			}
 		}

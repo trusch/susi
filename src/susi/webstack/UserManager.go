@@ -5,36 +5,36 @@
  * complete text in the attached LICENSE file or online at:
  *
  * http://www.opensource.org/licenses/mit-license.php
- * 
+ *
  * @author: Tino Rusch (tino.rusch@webvariants.de)
  */
 
 package webstack
 
 import (
+	"bytes"
 	"crypto/sha512"
 	"encoding/base64"
-	"bytes"
-	"flag"
-	"os"
-	"log"
 	"encoding/json"
+	"flag"
+	"log"
+	"os"
 )
 
-var hashRounds = flag.Int("webstack.hashRounds",64,"How many hash rounds to perform")
-var usersFile = flag.String("webstack.usersFile","users.json","The file where the login data will be saved")
+var hashRounds = flag.Int("webstack.hashRounds", 64, "How many hash rounds to perform")
+var usersFile = flag.String("webstack.usersFile", "users.json", "The file where the login data will be saved")
 
 func NewUserManager() *UserManager {
 	ptr := new(UserManager)
-	ptr.cmds = make(chan userManagerCommand,10)
-	ptr.users = make([]User,0,32)
+	ptr.cmds = make(chan userManagerCommand, 10)
+	ptr.users = make([]User, 0, 32)
 	ptr.Load()
 	go ptr.backend()
 	return ptr
 }
-func (ptr *UserManager) AddUser(name,password string) bool {
+func (ptr *UserManager) AddUser(name, password string) bool {
 	cmd := userManagerCommand{
-		Type: ADDUSER,
+		Type:   ADDUSER,
 		Return: make(chan bool),
 		User: User{
 			Username: name,
@@ -47,19 +47,19 @@ func (ptr *UserManager) AddUser(name,password string) bool {
 
 func (ptr *UserManager) DelUser(name string) bool {
 	cmd := userManagerCommand{
-		Type: DELUSER,
+		Type:   DELUSER,
 		Return: make(chan bool),
 		User: User{
 			Username: name,
 		},
 	}
 	ptr.cmds <- cmd
-	return <- cmd.Return
+	return <-cmd.Return
 }
 
-func (ptr *UserManager) CheckUser(name,password string) bool {
+func (ptr *UserManager) CheckUser(name, password string) bool {
 	cmd := userManagerCommand{
-		Type: CHECKUSER,
+		Type:   CHECKUSER,
 		Return: make(chan bool),
 		User: User{
 			Username: name,
@@ -76,17 +76,18 @@ type User struct {
 }
 
 func (user *User) HashPassword() {
-	for i:=0;i<*hashRounds;i++ {
+	for i := 0; i < *hashRounds; i++ {
 		buff := &bytes.Buffer{}
 		hash := sha512.New()
-		encoder := base64.NewEncoder(base64.StdEncoding,buff)
+		encoder := base64.NewEncoder(base64.StdEncoding, buff)
 		hash.Write([]byte(user.Password))
-		encoder.Write(hash.Sum(make([]byte,0,20)))
+		encoder.Write(hash.Sum(make([]byte, 0, 20)))
 		user.Password = buff.String()
 	}
 }
 
 type userManagerCommandType int
+
 const (
 	ADDUSER userManagerCommandType = iota
 	DELUSER
@@ -94,37 +95,38 @@ const (
 )
 
 type userManagerCommand struct {
-	User User
-	Type userManagerCommandType
+	User   User
+	Type   userManagerCommandType
 	Return chan bool
 }
 
-
 type UserManager struct {
-	cmds chan userManagerCommand
+	cmds  chan userManagerCommand
 	users []User
 }
 
 func (manager *UserManager) backend() {
-	MAINLOOP:
+MAINLOOP:
 	for cmd := range manager.cmds {
 		switch cmd.Type {
-			case ADDUSER: {
-				for _,user := range manager.users {
+		case ADDUSER:
+			{
+				for _, user := range manager.users {
 					if user.Username == cmd.User.Username {
 						cmd.Return <- false
 						continue MAINLOOP
 					}
 				}
 				cmd.User.HashPassword()
-				manager.users = append(manager.users,cmd.User)
+				manager.users = append(manager.users, cmd.User)
 				manager.Save()
 				cmd.Return <- true
 			}
-			case DELUSER:{	
-				for idx,user := range manager.users {
+		case DELUSER:
+			{
+				for idx, user := range manager.users {
 					if user.Username == cmd.User.Username {
-						manager.users = append(manager.users[:idx],manager.users[idx+1:]...)
+						manager.users = append(manager.users[:idx], manager.users[idx+1:]...)
 						manager.Save()
 						cmd.Return <- true
 						continue MAINLOOP
@@ -132,14 +134,15 @@ func (manager *UserManager) backend() {
 				}
 				cmd.Return <- false
 			}
-			case CHECKUSER: {
+		case CHECKUSER:
+			{
 				cmd.User.HashPassword()
-				for _,user := range manager.users {
+				for _, user := range manager.users {
 					if user.Username == cmd.User.Username {
 						if user.Password == cmd.User.Password {
 							cmd.Return <- true
 							continue MAINLOOP
-						}else{
+						} else {
 							cmd.Return <- false
 							continue MAINLOOP
 						}
@@ -151,31 +154,31 @@ func (manager *UserManager) backend() {
 	}
 }
 
-func (ptr *UserManager) Load(){
-	f,err := os.Open(*usersFile)
-	if err!=nil {
+func (ptr *UserManager) Load() {
+	f, err := os.Open(*usersFile)
+	if err != nil {
 		log.Print(err)
 		return
 	}
 	defer f.Close()
 	decoder := json.NewDecoder(f)
 	err = decoder.Decode(&ptr.users)
-	if err!=nil {
+	if err != nil {
 		log.Print(err)
 		return
 	}
 }
 
-func (ptr *UserManager) Save(){
-	f,err := os.Create(*usersFile)
-	if err!=nil {
+func (ptr *UserManager) Save() {
+	f, err := os.Create(*usersFile)
+	if err != nil {
 		log.Print(err)
 		return
 	}
 	defer f.Close()
 	encoder := json.NewEncoder(f)
 	err = encoder.Encode(ptr.users)
-	if err!=nil {
+	if err != nil {
 		log.Print(err)
 		return
 	}

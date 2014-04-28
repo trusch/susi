@@ -5,7 +5,7 @@
  * complete text in the attached LICENSE file or online at:
  *
  * http://www.opensource.org/licenses/mit-license.php
- * 
+ *
  * @author: Tino Rusch (tino.rusch@webvariants.de)
  */
 
@@ -13,51 +13,51 @@ package config
 
 import (
 	"../state"
-	"os"
-	"log"
 	"encoding/json"
 	"flag"
+	"log"
+	"os"
 	"path/filepath"
 	"strings"
 	"time"
 )
 
-var configPath = flag.String("configPath",".","path to your configfiles")
+var configPath = flag.String("configPath", ".", "path to your configfiles")
 
 type ConfigManager struct {
 	modifiedTimes map[string]time.Time
 }
 
 func (ptr *ConfigManager) LoadFileToState(filename string) error {
-	f,err := os.Open(filename)
-	if err!=nil {
+	f, err := os.Open(filename)
+	if err != nil {
 		return err
 	}
 	defer f.Close()
-	basekey := strings.Replace(filename,"/",".",-1)
-	lastDot := strings.LastIndex(basekey,".")
+	basekey := strings.Replace(filename, "/", ".", -1)
+	lastDot := strings.LastIndex(basekey, ".")
 	basekey = basekey[:lastDot]
 	decoder := json.NewDecoder(f)
 	data := make(map[string]interface{})
 	err = decoder.Decode(&data)
-	if err!=nil {
-		log.Print("malformed config file: ",filename," (",err,")")
+	if err != nil {
+		log.Print("malformed config file: ", filename, " (", err, ")")
 		return err
 	}
-	for key,val := range data {
-		log.Print("load config: ",basekey+"."+key," : ",val)
-		state.Set(basekey+"."+key,val)
+	for key, val := range data {
+		log.Print("load config: ", basekey+"."+key, " : ", val)
+		state.Set(basekey+"."+key, val)
 	}
 	return nil
 }
 
-func (ptr *ConfigManager) LoadFiles(){
-	filepath.Walk(*configPath,func(path string, info os.FileInfo, err error) error {
+func (ptr *ConfigManager) LoadFiles() {
+	filepath.Walk(*configPath, func(path string, info os.FileInfo, err error) error {
 		name := info.Name()
-		if !info.IsDir() && (strings.HasSuffix(name,"conf") || strings.HasSuffix(name,"cfg")){
+		if !info.IsDir() && (strings.HasSuffix(name, "conf") || strings.HasSuffix(name, "cfg")) {
 			oldTime := ptr.modifiedTimes[name]
 			newTime := info.ModTime()
-			if(!newTime.Equal(oldTime)){
+			if !newTime.Equal(oldTime) {
 				ptr.LoadFileToState(path)
 				ptr.modifiedTimes[name] = newTime
 			}
@@ -66,36 +66,36 @@ func (ptr *ConfigManager) LoadFiles(){
 	})
 }
 
-func (ptr *ConfigManager) LoadDefaultFlags(){
-	flag.VisitAll(func(flag *flag.Flag){
-		state.Set(flag.Name,flag.Value.String())	
+func (ptr *ConfigManager) LoadDefaultFlags() {
+	flag.VisitAll(func(flag *flag.Flag) {
+		state.Set(flag.Name, flag.Value.String())
 	})
 }
 
-func (ptr *ConfigManager) LoadFlags(){
-	flag.VisitAll(func(flag *flag.Flag){
+func (ptr *ConfigManager) LoadFlags() {
+	flag.VisitAll(func(flag *flag.Flag) {
 		if flag.DefValue != flag.Value.String() {
-			state.Set(flag.Name,flag.Value.String())
+			state.Set(flag.Name, flag.Value.String())
 		}
 	})
 }
 
-func Go(){
+func Go() {
 	ptr := new(ConfigManager)
 	ptr.modifiedTimes = make(map[string]time.Time)
 	ch := make(chan bool)
-	go func(){
+	go func() {
 		flag.Parse()
 		ptr.LoadDefaultFlags()
 		ptr.LoadFiles()
 		ptr.LoadFlags()
 		ch <- true
-		time.Sleep(5*time.Second)
-		for{
+		time.Sleep(5 * time.Second)
+		for {
 			ptr.LoadFiles()
 			//ptr.LoadFlags()
 
-			time.Sleep(5*time.Second)
+			time.Sleep(5 * time.Second)
 		}
 	}()
 	<-ch

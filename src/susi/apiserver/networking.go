@@ -134,7 +134,7 @@ func HandleConnection(conn net.Conn, authlevel uint8) {
 		req := ApiMessage{}
 		err := decoder.Decode(&req)
 		if err != nil {
-			log.Print("lost connection or parse error: ",err)
+			log.Print("lost connection or parse error: ", err)
 			return
 		}
 		if req.AuthLevel < authlevel {
@@ -221,7 +221,6 @@ func Go() {
 	certStr := state.Get("apiserver.tls.certificate").(string)
 	keyStr := state.Get("apiserver.tls.key").(string)
 
-
 	if certStr != "" && keyStr != "" {
 		cert, err := tls.LoadX509KeyPair(certStr, keyStr)
 		if err != nil {
@@ -251,7 +250,7 @@ func Go() {
 				}
 				myCert := cert.Certificate[0]
 				peerCertIsMyCert := true
-				if certs := tlsConn.ConnectionState().PeerCertificates; len(certs)>0 {
+				if certs := tlsConn.ConnectionState().PeerCertificates; len(certs) > 0 {
 					peerCert := certs[0].Raw
 					if len(peerCert) == len(myCert) {
 						for idx, chr := range peerCert {
