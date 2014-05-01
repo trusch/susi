@@ -46,7 +46,7 @@ func (ptr *ConfigManager) LoadFileToState(filename string) error {
 		return err
 	}
 	for key, val := range data {
-		log.Print("load config: ", basekey+"."+key, " : ", val)
+		//log.Print("load config: ", basekey+"."+key, " : ", val)
 		state.Set(basekey+"."+key, val)
 	}
 	return nil
