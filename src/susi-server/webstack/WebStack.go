@@ -31,9 +31,10 @@ func Go(){
 	keyFile := state.Get("webstack.tls.key").(string)
 	assetsDir := state.Get("webstack.assets").(string)
 
-	assetHandler := http.StripPrefix("/assets/", http.FileServer(http.Dir(assetsDir)))
+	handler := http.NewServeMux()
+	handler.Handle("/assets/",http.StripPrefix("/assets/", http.FileServer(http.Dir(assetsDir))))
 
-	authHandler := &AuthHandler{assetHandler}
+	authHandler := NewAuthHandler(handler)
 
 	server := &http.Server{
 		Addr:           addr,

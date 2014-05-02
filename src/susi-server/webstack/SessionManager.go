@@ -14,10 +14,13 @@ package webstack
 import (
 	"flag"
 	"time"
+	"strconv"
+	"log"
+	"../state"
 )
 
-var sessionLifetime = flag.Int("session.lifetime", 60, "how many seconds should a session stay alive before being invalidated")
-var sessionCheckInterval = flag.Int("session.checkinterval", 10, "check interval in seconds")
+var sessionLifetime = flag.String("webstack.session.lifetime", "60", "how many seconds should a session stay alive before being invalidated")
+var sessionCheckInterval = flag.String("webstack.session.checkinterval", "10", "check interval in seconds")
 
 type Session struct {
 	Id         uint64
@@ -50,11 +53,16 @@ type SessionManager struct {
 
 func (ptr *SessionManager) addSession(user string, authlevel int) (id uint64) {
 	id = uint64(time.Now().UnixNano())
+	lifetimeStr := state.Get("webstack.session.lifetime").(string)
+	lifetime,err := strconv.ParseInt(lifetimeStr,10,64)
+	if err!=nil {
+		log.Fatal(err)
+	}
 	session := &Session{
 		Id:         id,
 		User:       user,
 		AuthLevel:  authlevel,
-		ValidUntil: time.Now().Unix() + int64(*sessionLifetime),
+		ValidUntil: time.Now().Unix() + lifetime,
 	}
 	ptr.sessions = append(ptr.sessions, session)
 	return id
@@ -70,9 +78,14 @@ func (ptr *SessionManager) delSession(id uint64) {
 }
 
 func (ptr *SessionManager) updateSession(id uint64) {
+	lifetimeStr := state.Get("webstack.session.lifetime").(string)
+	lifetime,err := strconv.ParseInt(lifetimeStr,10,64)
+	if err!=nil {
+		log.Fatal(err)
+	}
 	for _, session := range ptr.sessions {
 		if session.Id == id {
-			session.ValidUntil += 60
+			session.ValidUntil = time.Now().Unix()+lifetime
 			break
 		}
 	}
@@ -99,7 +112,12 @@ func (ptr *SessionManager) checkSessions() {
 }
 
 func (ptr *SessionManager) backend() {
-	ticker := time.Tick(time.Duration(*sessionCheckInterval) * time.Second)
+	intervalStr := state.Get("webstack.session.checkinterval").(string)
+	interval,err := strconv.ParseInt(intervalStr,10,64)
+	if err!=nil {
+		log.Fatal(err)
+	}
+	ticker := time.Tick(time.Duration(interval) * time.Second)
 	for {
 		select {
 		case cmd := <-ptr.commands:

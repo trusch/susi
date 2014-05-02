@@ -19,6 +19,7 @@ import (
 	"flag"
 	"log"
 	"os"
+	"../events"
 )
 
 var hashRounds = flag.Int("webstack.hashRounds", 64, "How many hash rounds to perform")
@@ -30,6 +31,7 @@ func NewUserManager() *UserManager {
 	ptr.users = make([]User, 0, 32)
 	ptr.Load()
 	go ptr.backend()
+	go ptr.adduserloop()
 	return ptr
 }
 func (ptr *UserManager) AddUser(name, password string) bool {
@@ -81,7 +83,7 @@ func (user *User) HashPassword() {
 		hash := sha512.New()
 		encoder := base64.NewEncoder(base64.StdEncoding, buff)
 		hash.Write([]byte(user.Password))
-		encoder.Write(hash.Sum(make([]byte, 0, 20)))
+		encoder.Write(hash.Sum(make([]byte, 0, hash.Size())))
 		user.Password = buff.String()
 	}
 }
@@ -182,4 +184,22 @@ func (ptr *UserManager) Save() {
 		log.Print(err)
 		return
 	}
+}
+
+func (ptr *UserManager) adduserloop() {
+	addUserChan,_ := events.Subscribe("users::add",0)
+	go func(){
+		for event := range addUserChan {
+			if payload,ok := event.Payload.(map[string]interface{}); ok {
+				username,ok1 := payload["username"].(string)
+				password,ok2 := payload["password"].(string)
+				if ok1&&ok2 {
+					ptr.AddUser(username,password)
+					log.Print("add user")
+				}
+			}else{
+				log.Print("malformed users::add request")
+			}
+		}
+	}()
 }
