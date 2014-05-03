@@ -37,7 +37,7 @@ func (ptr *ConfigManager) LoadFileToState(filename string) error {
 	basekey := strings.Replace(filename, "/", ".", -1)
 	lastDot := strings.LastIndex(basekey, ".")
 	firstDot := strings.Index(basekey, ".")
-	basekey = basekey[firstDot+1:lastDot]
+	basekey = basekey[firstDot+1 : lastDot]
 	decoder := json.NewDecoder(f)
 	data := make(map[string]interface{})
 	err = decoder.Decode(&data)

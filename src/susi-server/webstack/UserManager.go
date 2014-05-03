@@ -12,6 +12,7 @@
 package webstack
 
 import (
+	"../events"
 	"bytes"
 	"crypto/sha512"
 	"encoding/base64"
@@ -19,7 +20,6 @@ import (
 	"flag"
 	"log"
 	"os"
-	"../events"
 )
 
 var hashRounds = flag.Int("webstack.hashRounds", 64, "How many hash rounds to perform")
@@ -187,17 +187,21 @@ func (ptr *UserManager) Save() {
 }
 
 func (ptr *UserManager) adduserloop() {
-	addUserChan,_ := events.Subscribe("users::add",0)
-	go func(){
+	addUserChan, _ := events.Subscribe("users::add", 0)
+	go func() {
 		for event := range addUserChan {
-			if payload,ok := event.Payload.(map[string]interface{}); ok {
-				username,ok1 := payload["username"].(string)
-				password,ok2 := payload["password"].(string)
-				if ok1&&ok2 {
-					ptr.AddUser(username,password)
+			if event.AuthLevel > 0 {
+				log.Print("Wrong authlevel to use users::add. Need AuthLevel 0.")
+				continue
+			}
+			if payload, ok := event.Payload.(map[string]interface{}); ok {
+				username, ok1 := payload["username"].(string)
+				password, ok2 := payload["password"].(string)
+				if ok1 && ok2 {
+					ptr.AddUser(username, password)
 					log.Print("add user")
 				}
-			}else{
+			} else {
 				log.Print("malformed users::add request")
 			}
 		}

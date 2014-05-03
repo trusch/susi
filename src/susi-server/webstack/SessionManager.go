@@ -12,11 +12,11 @@
 package webstack
 
 import (
-	"flag"
-	"time"
-	"strconv"
-	"log"
 	"../state"
+	"flag"
+	"log"
+	"strconv"
+	"time"
 )
 
 var sessionLifetime = flag.String("webstack.session.lifetime", "60", "how many seconds should a session stay alive before being invalidated")
@@ -54,8 +54,8 @@ type SessionManager struct {
 func (ptr *SessionManager) addSession(user string, authlevel int) (id uint64) {
 	id = uint64(time.Now().UnixNano())
 	lifetimeStr := state.Get("webstack.session.lifetime").(string)
-	lifetime,err := strconv.ParseInt(lifetimeStr,10,64)
-	if err!=nil {
+	lifetime, err := strconv.ParseInt(lifetimeStr, 10, 64)
+	if err != nil {
 		log.Fatal(err)
 	}
 	session := &Session{
@@ -79,13 +79,13 @@ func (ptr *SessionManager) delSession(id uint64) {
 
 func (ptr *SessionManager) updateSession(id uint64) {
 	lifetimeStr := state.Get("webstack.session.lifetime").(string)
-	lifetime,err := strconv.ParseInt(lifetimeStr,10,64)
-	if err!=nil {
+	lifetime, err := strconv.ParseInt(lifetimeStr, 10, 64)
+	if err != nil {
 		log.Fatal(err)
 	}
 	for _, session := range ptr.sessions {
 		if session.Id == id {
-			session.ValidUntil = time.Now().Unix()+lifetime
+			session.ValidUntil = time.Now().Unix() + lifetime
 			break
 		}
 	}
@@ -113,8 +113,8 @@ func (ptr *SessionManager) checkSessions() {
 
 func (ptr *SessionManager) backend() {
 	intervalStr := state.Get("webstack.session.checkinterval").(string)
-	interval,err := strconv.ParseInt(intervalStr,10,64)
-	if err!=nil {
+	interval, err := strconv.ParseInt(intervalStr, 10, 64)
+	if err != nil {
 		log.Fatal(err)
 	}
 	ticker := time.Tick(time.Duration(interval) * time.Second)

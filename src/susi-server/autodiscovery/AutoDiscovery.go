@@ -99,7 +99,7 @@ func (ptr *AutodiscoveryManager) ListenForMulticastMessage() {
 	ownApiAddr := ptr.GetOwnAddr(state.Get("apiserver.port").(string))
 	ownDiscoveryAddr := ptr.GetOwnAddr(state.Get("autodiscovery.port").(string))
 
-	mcaddr, err := net.ResolveUDPAddr("udp",state.Get("autodiscovery.mcastAddr").(string))
+	mcaddr, err := net.ResolveUDPAddr("udp", state.Get("autodiscovery.mcastAddr").(string))
 	if err != nil {
 		//log.Println(err)
 		return
