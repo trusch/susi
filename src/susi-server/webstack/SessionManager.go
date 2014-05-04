@@ -12,6 +12,7 @@
 package webstack
 
 import (
+	"../events"
 	"../state"
 	"flag"
 	"log"
@@ -19,14 +20,14 @@ import (
 	"time"
 )
 
-var sessionLifetime = flag.String("webstack.session.lifetime", "60", "how many seconds should a session stay alive before being invalidated")
+var sessionLifetime = flag.String("webstack.session.lifetime", "1800", "how many seconds should a session stay alive before being invalidated")
 var sessionCheckInterval = flag.String("webstack.session.checkinterval", "10", "check interval in seconds")
 
 type Session struct {
-	Id         uint64
-	User       string
-	AuthLevel  int
-	ValidUntil int64
+	Id         uint64 `json:"-"`
+	User       string `json:"user"`
+	AuthLevel  int    `json:"authlevel"`
+	ValidUntil int64  `json:"validuntil"`
 }
 
 type sessionCommandType uint8
@@ -72,6 +73,9 @@ func (ptr *SessionManager) delSession(id uint64) {
 	for idx, session := range ptr.sessions {
 		if session.Id == id {
 			ptr.sessions = append(ptr.sessions[:idx], ptr.sessions[idx+1:]...)
+			event := events.NewEvent("session::delete", id)
+			event.AuthLevel = 0
+			events.Publish(event)
 			break
 		}
 	}
@@ -106,6 +110,10 @@ func (ptr *SessionManager) checkSessions() {
 	for _, session := range ptr.sessions {
 		if session.ValidUntil > now {
 			newSessions = append(newSessions, session)
+		} else {
+			event := events.NewEvent("session::delete", session.Id)
+			event.AuthLevel = 0
+			events.Publish(event)
 		}
 	}
 	ptr.sessions = newSessions

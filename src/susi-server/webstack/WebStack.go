@@ -13,11 +13,14 @@ package webstack
 
 import (
 	"../state"
+	"../apiserver"
 	"crypto/tls"
 	"flag"
 	"log"
 	"net/http"
 	"time"
+	"strconv"
+	"code.google.com/p/go.net/websocket"
 )
 
 var httpAddr = flag.String("webstack.addr", ":8080", "The web addr")
@@ -31,9 +34,19 @@ func Go() {
 	keyFile := state.Get("webstack.tls.key").(string)
 	assetsDir := state.Get("webstack.assets").(string)
 
+	eventsHandler := NewEventsHandler()
+
 	handler := http.NewServeMux()
 	handler.Handle("/assets/", http.StripPrefix("/assets/", http.FileServer(http.Dir(assetsDir))))
+	handler.Handle("/events/", eventsHandler)
+	handler.Handle("/ws",websocket.Handler(func(ws *websocket.Conn){
+		req := ws.Request()
+		authlevel_, _ := strconv.Atoi(req.Header.Get("authlevel"))
+		authlevel := uint8(authlevel_)
+		apiserver.HandleConnection(ws,authlevel)
+	}))
 	handler.Handle("/", http.RedirectHandler("/assets/main.html", http.StatusMovedPermanently))
+	
 	authHandler := NewAuthHandler(handler)
 
 	server := &http.Server{

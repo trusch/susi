@@ -12,6 +12,8 @@
 var susi = {
 	internal : {
 		sendPostMessage: function(url,data,callback,errorcallback){
+			callback = callback || susi.internal.log
+			errorcallback = errorcallback || susi.internal.log
 			var xmlhttp;
 			if (window.XMLHttpRequest) {// code for IE7+, Firefox, Chrome, Opera, Safari
 				xmlhttp = new XMLHttpRequest();
@@ -34,6 +36,10 @@ var susi = {
 			xmlhttp.open("POST",url,true);
 			xmlhttp.send(JSON.stringify(data));
 		},
+
+		log: function(data){
+			console.log(data)
+		}
 	},
 
 	auth: {
@@ -44,8 +50,7 @@ var susi = {
 			var onError = function(){
 				console.log("failed logging in as "+username)
 			} 
-			susi.internal.sendPostMessage("/auth/login",
-				{username: username,password: password},
+			susi.internal.sendPostMessage("/auth/login",{username: username,password: password},
 				onSuccess,
 				onError);
 		},
@@ -59,27 +64,51 @@ var susi = {
 		},
 
 		info: function(){
-			susi.internal.sendPostMessage("/auth/info",null,function(data){
-				console.log(data)
-			});	
-		}
+			susi.internal.sendPostMessage("/auth/info",null,susi.internal.log);	
+		},
+
 	},
 
 	events: {
-		publish: function(key,data){
-			
+
+		subscriptions: {},
+
+		publish: function(key,data,authlevel,returnaddr){
+			authlevel = authlevel || 0
+			var msg = {
+				key: key,
+				payload: data,
+				authlevel: authlevel,
+				returnaddr: returnaddr
+			}
+			susi.internal.sendPostMessage("/events/publish",msg)
 		},
-		subscribe: function(key){
-			
+		subscribe: function(key,callback,authlevel){
+			authlevel = authlevel || 0
+			var msg = {
+				key: key,
+				authlevel: authlevel
+			}
+			susi.events.subscriptions[key] = susi.events.subscriptions[key] || []
+			susi.events.subscriptions[key].push(callback)
+			susi.internal.sendPostMessage("/events/subscribe",msg)
 		},
-		get: function(datacallback){
-			
+		get: function(){
+			susi.internal.sendPostMessage("/events/get",null,function(result){
+				result = JSON.parse(result)
+				if (result !== null) {
+					for (var i = result.length - 1; i >= 0; i--) {
+						var evt = result[i]
+						var callbacks = susi.events.subscriptions[evt.topic]
+						if (callbacks != null ){
+							for (var j = callbacks.length - 1; j >= 0; j--) {
+								callbacks[j](evt)
+							};
+						}
+					};
+				}
+			})
 		}
 	},
-
-	state: {
-
-	},
-
 
 }

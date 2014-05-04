@@ -19,6 +19,7 @@ import (
 	"flag"
 	"log"
 	"net"
+	"time"
 )
 
 var apiTcpPort = flag.String("apiserver.port", "4000", "The port of the susi api server")
@@ -27,11 +28,12 @@ var apiCertFile = flag.String("apiserver.tls.cert", "", "The certificate to use 
 var apiKeyFile = flag.String("apiserver.tls.key", "", "The key to use in the api server")
 
 type ApiMessage struct {
-	Id        int64       `json:"id,omitempty"`
-	AuthLevel uint8       `json:"authlevel,omitempty"`
-	Type      string      `json:"type"`
-	Key       string      `json:"key"`
-	Payload   interface{} `json:"payload,omitempty"`
+	Id         int64       `json:"id,omitempty"`
+	AuthLevel  uint8       `json:"authlevel,omitempty"`
+	Type       string      `json:"type"`
+	Key        string      `json:"key"`
+	ReturnAddr string      `json:"returnaddr"`
+	Payload    interface{} `json:"payload,omitempty"`
 }
 
 func NewApiMessage() *ApiMessage {
@@ -119,6 +121,7 @@ func (conn *Connection) unsubscribe(req *ApiMessage) {
 }
 
 func HandleConnection(conn net.Conn, authlevel uint8) {
+	conn.SetDeadline(time.Time{})
 	connection := NewConnection(conn)
 	defer func() {
 		for _, ch := range connection.subscribtions {

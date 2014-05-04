@@ -65,10 +65,10 @@ func NewSyncedSender(conn net.Conn) *SyncedSender {
 	return sw
 }
 func (sw *SyncedSender) Send(data interface{}) error {
-	sw.in <- data
 	if sw.closed {
 		return errors.New("error while sending")
 	}
+	sw.in <- data
 	return nil
 }
 func (sw *SyncedSender) Close() {

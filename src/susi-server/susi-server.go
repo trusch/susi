@@ -37,14 +37,13 @@ func main() {
 	flag.Parse()
 
 	events.Go()
-
 	EventPrinter()
-
 	state.Go()
 	config.Go()
 	apiserver.Go()
 	remoteeventcollector.Go()
 	autodiscovery.Go()
 	webstack.Go()
+
 	select {}
 }

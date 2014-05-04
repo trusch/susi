@@ -17,11 +17,11 @@ import (
 )
 
 type Event struct {
-	Id         uint64
-	Topic      string
-	AuthLevel  uint8
-	ReturnAddr string
-	Payload    interface{}
+	Id         uint64      `json:"id"`
+	Topic      string      `json:"topic"`
+	AuthLevel  uint8       `json:"authlevel"`
+	ReturnAddr string      `json:"returnaddr"`
+	Payload    interface{} `json:"payload"`
 }
 
 func NewEvent(topic string, payload interface{}) *Event {

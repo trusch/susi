@@ -39,7 +39,7 @@ func NewAuthHandler(defaultHandler http.Handler) *AuthHandler {
 	result := new(AuthHandler)
 	result.defaultHandler = defaultHandler
 	result.sessionManager = NewSessionManager()
-	result.userManager    = NewUserManager()
+	result.userManager = NewUserManager()
 
 	cookieKeyStr := state.Get("webstack.cookiekey").(string)
 	hash := sha512.New()
@@ -58,7 +58,7 @@ func (ptr *AuthHandler) addSession(resp http.ResponseWriter) (uint64, error) {
 	}
 	cipher.Encrypt(sessionIdBytes, sessionIdBytes)
 	cookieStr := base64.StdEncoding.EncodeToString(sessionIdBytes)
-	cookie := &http.Cookie{Name: "susisession", Value: cookieStr}
+	cookie := &http.Cookie{Name: "susisession", Value: cookieStr, Path: "/"}
 	http.SetCookie(resp, cookie)
 	return sessionId, nil
 }
@@ -100,6 +100,8 @@ func (ptr *AuthHandler) sessionHandling(resp http.ResponseWriter, req *http.Requ
 func (ptr *AuthHandler) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 	sessionId, err := ptr.sessionHandling(resp, req)
 	session := ptr.sessionManager.GetSession(sessionId)
+	req.Header.Del("authlevel")
+	req.Header.Add("authlevel", strconv.Itoa(session.AuthLevel))
 	path := req.URL.Path
 	if strings.HasPrefix(path, "/auth") {
 		switch {
