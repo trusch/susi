@@ -87,11 +87,14 @@ func (ptr *AuthHandler) getSession(req *http.Request) (uint64, error) {
 
 func (ptr *AuthHandler) sessionHandling(resp http.ResponseWriter, req *http.Request) (uint64, error) {
 	sessionId, err := ptr.getSession(req)
+	log.Println(sessionId)
 	if err != nil {
+		log.Print(err)
 		return ptr.addSession(resp)
 	}
 	session := ptr.sessionManager.GetSession(sessionId)
 	if session == nil {
+		log.Print("dont find session...")
 		return ptr.addSession(resp)
 	}
 	return sessionId, nil
@@ -102,6 +105,7 @@ func (ptr *AuthHandler) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 	session := ptr.sessionManager.GetSession(sessionId)
 	req.Header.Del("authlevel")
 	req.Header.Add("authlevel", strconv.Itoa(session.AuthLevel))
+	log.Print("SESSION:",session)
 	path := req.URL.Path
 	if strings.HasPrefix(path, "/auth") {
 		switch {

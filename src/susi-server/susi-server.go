@@ -19,6 +19,7 @@ import (
 	"./remoteeventcollector"
 	"./state"
 	"./webstack"
+	"./jsengine"
 	"flag"
 	"log"
 )
@@ -44,6 +45,7 @@ func main() {
 	remoteeventcollector.Go()
 	autodiscovery.Go()
 	webstack.Go()
+	jsengine.Go()
 
 	select {}
 }

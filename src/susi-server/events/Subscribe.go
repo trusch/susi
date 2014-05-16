@@ -67,6 +67,7 @@ func (ptr *EventSystem) subscribe(topic string, authlevel uint8) (eventChannel c
 		subscription := &subscription{
 			Topic:     topic,
 			EventChan: eventChannel,
+			AuthLevel: authlevel,
 		}
 		subscriptionsMap[id] = subscription
 	}

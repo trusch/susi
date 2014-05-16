@@ -39,7 +39,20 @@ var susi = {
 
 		log: function(data){
 			console.log(data)
-		}
+		},
+
+		now: Date.now || function(){
+			return (new Date()).getTime();
+		},
+
+		objectIsEmpty: function(obj){
+			for(var key in obj) {
+				if (obj.hasOwnProperty(key)) {
+					return false;
+				}
+			}
+			return true;
+		},
 	},
 
 	auth: {
@@ -84,30 +97,41 @@ var susi = {
 			susi.internal.sendPostMessage("/events/publish",msg)
 		},
 		subscribe: function(key,callback,authlevel){
-			authlevel = authlevel || 0
+			authlevel = authlevel || 0;
 			var msg = {
 				key: key,
 				authlevel: authlevel
+			};
+			susi.events.subscriptions[key] = susi.events.subscriptions[key] || {};
+			var id = susi.internal.now();
+			susi.events.subscriptions[key][id] = callback;
+			susi.internal.sendPostMessage("/events/subscribe",msg);
+			return id;
+		},
+		unsubscribe: function(key,id){
+			delete(susi.events.subscriptions[key][id]);
+			if(susi.internal.objectIsEmpty(susi.events.subscriptions[key])){
+				delete(susi.events.subscriptions[key]);
+				susi.internal.sendPostMessage("/events/unsubscribe",{key: key});
 			}
-			susi.events.subscriptions[key] = susi.events.subscriptions[key] || []
-			susi.events.subscriptions[key].push(callback)
-			susi.internal.sendPostMessage("/events/subscribe",msg)
 		},
 		get: function(){
 			susi.internal.sendPostMessage("/events/get",null,function(result){
-				result = JSON.parse(result)
+				result = JSON.parse(result);
 				if (result !== null) {
 					for (var i = result.length - 1; i >= 0; i--) {
-						var evt = result[i]
-						var callbacks = susi.events.subscriptions[evt.topic]
+						var evt = result[i];
+						var callbacks = susi.events.subscriptions[evt.topic];
 						if (callbacks != null ){
-							for (var j = callbacks.length - 1; j >= 0; j--) {
-								callbacks[j](evt)
-							};
+							for (var key in callbacks) {
+								if (callbacks.hasOwnProperty(key)) {
+									callbacks[key](evt);
+								}
+							}
 						}
-					};
+					}
 				}
-			})
+			});
 		}
 	},
 
