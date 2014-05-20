@@ -105,7 +105,7 @@ func (ptr *AuthHandler) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 	session := ptr.sessionManager.GetSession(sessionId)
 	req.Header.Del("authlevel")
 	req.Header.Add("authlevel", strconv.Itoa(session.AuthLevel))
-	log.Print("SESSION:",session)
+	log.Print("SESSION:", session)
 	path := req.URL.Path
 	if strings.HasPrefix(path, "/auth") {
 		switch {

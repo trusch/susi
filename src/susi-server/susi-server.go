@@ -16,10 +16,10 @@ import (
 	"./autodiscovery"
 	"./config"
 	"./events"
+	"./jsengine"
 	"./remoteeventcollector"
 	"./state"
 	"./webstack"
-	"./jsengine"
 	"flag"
 	"log"
 )

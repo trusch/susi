@@ -34,5 +34,5 @@ func NewEvent(topic string, payload interface{}) *Event {
 }
 
 func (evt *Event) String() string {
-	return fmt.Sprintf("%v", *evt)
+	return fmt.Sprintf("Topic: %v; AuthLevel: %v; Payload: %v", evt.Topic, evt.AuthLevel, evt.Payload)
 }

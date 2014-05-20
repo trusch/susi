@@ -12,5 +12,8 @@ clean:
 	-rm -rf bin
 	-rm -rf ./dev/cert.pem ./dev/key.pem
 
+fmt:
+	for d in src/susi-server/*/; do go fmt $$d/*; done
+
 bin:
 	mkdir bin
