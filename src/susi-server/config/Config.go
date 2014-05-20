@@ -34,6 +34,7 @@ func (ptr *ConfigManager) LoadFileToState(filename string) error {
 		return err
 	}
 	defer f.Close()
+	filename = filename[len(*configPath):]
 	basekey := strings.Replace(filename, "/", ".", -1)
 	lastDot := strings.LastIndex(basekey, ".")
 	firstDot := strings.Index(basekey, ".")
@@ -82,6 +83,7 @@ func (ptr *ConfigManager) LoadFlags() {
 }
 
 func Go() {
+	flag.Parse()
 	ptr := new(ConfigManager)
 	ptr.modifiedTimes = make(map[string]time.Time)
 	ch := make(chan bool)
@@ -100,4 +102,5 @@ func Go() {
 		}
 	}()
 	<-ch
+	log.Print("Successfully loaded config files from ",*configPath)
 }

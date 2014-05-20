@@ -206,14 +206,5 @@ func Go() {
 	jsDir := state.Get("jsengine.root").(string)
 	ptr.searchForJS(jsDir)
 
-	/*ptr.vm.Run(`var subId = susi.events.subscribe("foo",
-		function(evt){
-			susi.log("got event in js backend: "+evt.Topic);
-			susi.events.unsubscribe("foo",subId);
-		})
-	`)
-	ptr.vm.Run(`susi.events.publish("foo")`)
-	ptr.vm.Run(`susi.events.publish("foo")`)*/
 	log.Print("Successfully started otto JS engine")
-
 }

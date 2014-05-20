@@ -1,0 +1,7 @@
+Package: susi-server
+Priority: optional
+Section: devel
+Maintainer: Tino Rusch <tino.rusch@webvariants.de>
+Architecture: all
+Version: 0.1
+Description: The SUSI server

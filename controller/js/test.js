@@ -9,5 +9,5 @@ var sampleController = {
 
 sampleController.init();
 
-susi.events.publish("foo",{this: "is it"});
+susi.events.publish("test",{this: "is the test"});
 
