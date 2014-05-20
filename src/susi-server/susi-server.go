@@ -38,7 +38,9 @@ func main() {
 	flag.Parse()
 
 	events.Go()
-	EventPrinter()
+	
+	//EventPrinter()
+	
 	state.Go()
 	config.Go()
 	apiserver.Go()

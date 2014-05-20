@@ -89,13 +89,13 @@ func (ptr *EventSystem) subscribe(topic string, authlevel uint8) (eventChannel c
 func (eventSystem *EventSystem) unsubscribe(topic string, id uint64) {
 	if topic != "" {
 		if subscriptions, ok := eventSystem.topics[topic]; ok {
-			if subscription,ok := subscriptions[id]; ok {
+			if subscription, ok := subscriptions[id]; ok {
 				close(subscription.EventChan)
 			}
 			delete(subscriptions, id)
 		}
 	} else {
-		if subscription,ok := eventSystem.globs[id]; ok {
+		if subscription, ok := eventSystem.globs[id]; ok {
 			close(subscription.EventChan)
 		}
 		delete(eventSystem.globs, id)
