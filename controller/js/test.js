@@ -1,9 +1,9 @@
 var sampleController = {
 	init: function(){
-		susi.events.subscribe("foo",this.fooCallback);
+		susi.events.subscribe("*",this.logCallback);
 	},
-	fooCallback: function(evt){
-		susi.log("Foo Callback: "+JSON.stringify(evt.Payload));
+	logCallback: function(evt){
+		susi.log("Logging: "+JSON.stringify(evt.Topic)+" : "+JSON.stringify(evt.Payload));
 	}
 }
 

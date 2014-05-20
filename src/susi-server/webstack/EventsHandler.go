@@ -206,7 +206,7 @@ func (ptr *EventsHandler) ServeHTTP(resp http.ResponseWriter, req *http.Request)
 				Key        string `json:"key"`
 				AuthLevel  uint8  `json:"authlevel"`
 				ReturnAddr string `json:"returnaddr"`
-				Payload    string `json:"payload"`
+				Payload    interface{} `json:"payload"`
 			}
 			msg := new(publishMsg)
 			err := decoder.Decode(&msg)
