@@ -21,6 +21,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"encoding/json"
 	"time"
 )
 
@@ -57,8 +58,22 @@ func (ptr *OttoEngine) dispatchEvent(event *events.Event) {
 		}
 		if match {
 			for _, functionCall := range subscription.Functions {
-				eventVal, _ := ptr.vm.ToValue(event)
-				ptr.vm.Call("Function.call.call", nil, functionCall.Argument(1), nil, eventVal)
+				marshaled,_ := json.Marshal(event)
+				unmarshaled := make(map[string]interface{})
+				json.Unmarshal(marshaled,&unmarshaled)
+				eventVal, err := ptr.vm.ToValue(unmarshaled)
+				if err!=nil {
+					log.Print(err)
+				}else{
+					func(){
+						defer func(){
+							if r := recover(); r != nil {
+								log.Print("PANIC while executing js callback: ", r)
+							}
+						}()
+						ptr.vm.Call("Function.call.call", nil, functionCall.Argument(1), nil, eventVal)
+					}()
+				}
 			}
 		}
 	}
@@ -149,6 +164,10 @@ func Go() {
 
 		if err1 != nil || err2 != nil || err3 != nil || err4 != nil {
 			return otto.FalseValue()
+		}
+
+		if returnaddr=="undefined" {
+			returnaddr = ""
 		}
 
 		event := events.NewEvent(key, data)

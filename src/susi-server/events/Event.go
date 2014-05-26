@@ -20,8 +20,8 @@ type Event struct {
 	Id         uint64      `json:"id"`
 	Topic      string      `json:"topic"`
 	AuthLevel  uint8       `json:"authlevel"`
-	ReturnAddr string      `json:"returnaddr"`
-	Payload    interface{} `json:"payload"`
+	ReturnAddr string      `json:"returnaddr,omitempty"`
+	Payload    interface{} `json:"payload,omitempty"`
 }
 
 func NewEvent(topic string, payload interface{}) *Event {

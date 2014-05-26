@@ -1,7 +1,7 @@
 OS=linux
 ARCH=amd64
 
-bin/susi-server: Makefile src/susi-server/*.go src/susi-server/*/*.go bin
+bin/susi-server: Makefile src/susi-server/*.go src/susi-server/*/*.go src/susi-server/*/*/*.go bin
 	GOOS=$(OS) GOARCH=$(ARCH) go build -o bin/susi-server src/susi-server/susi-server.go
 
 test: dev/cert.pem bin/susi-server

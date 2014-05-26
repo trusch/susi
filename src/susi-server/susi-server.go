@@ -22,16 +22,9 @@ import (
 	"./webstack"
 	"flag"
 	"log"
-)
 
-func EventPrinter() {
-	ch, _ := events.Subscribe("*", 0)
-	go func() {
-		for evt := range ch {
-			log.Println("EVENT: ", evt)
-		}
-	}()
-}
+	"./controller/firebirdconnector"
+)
 
 func main() {
 	log.SetFlags(log.Ldate | log.Ltime | log.Lshortfile)
@@ -39,7 +32,12 @@ func main() {
 
 	events.Go()
 	
-	//EventPrinter()
+	go func(){
+		ch,_ := events.Subscribe("*",0)
+		for event := range ch {
+			log.Print(event)
+		}
+	}()
 	
 	state.Go()
 	config.Go()
@@ -48,6 +46,19 @@ func main() {
 	autodiscovery.Go()
 	webstack.Go()
 	jsengine.Go()
+
+	firebirdconnector.Go()
+
+
+	event := events.NewEvent("firebird::query",map[string]interface{}{
+		"query": "SELECT DISTINCT JOB_TITLE FROM JOB WHERE JOB_TITLE LIKE ?;",
+		"args" : []interface{}{
+			"%er",
+		},
+	})
+	event.AuthLevel = 0
+	event.ReturnAddr = "sample::awnser"
+	events.Publish(event)
 
 	select {}
 }
