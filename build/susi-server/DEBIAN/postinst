@@ -1,3 +1,0 @@
-#!/bin/bash
-
-chmod +x /etc/init.d/susi-server
