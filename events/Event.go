@@ -20,7 +20,7 @@ type Event struct {
 	Id         uint64      `json:"id"`
 	Topic      string      `json:"topic"`
 	AuthLevel  uint8       `json:"authlevel"`
-	ReturnAddr string      `json:"returnaddr,omitempty"`
+	ReturnAddr string      `json:"returnaddr"`
 	Payload    interface{} `json:"payload,omitempty"`
 }
 
@@ -34,5 +34,5 @@ func NewEvent(topic string, payload interface{}) *Event {
 }
 
 func (evt *Event) String() string {
-	return fmt.Sprintf("Topic: %v; AuthLevel: %v; Payload: %v", evt.Topic, evt.AuthLevel, evt.Payload)
+	return fmt.Sprintf("Topic: %v; AuthLevel: %v; Return: %v", evt.Topic, evt.AuthLevel, evt.ReturnAddr)
 }

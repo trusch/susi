@@ -159,6 +159,7 @@ func HandleConnection(conn net.Conn, authlevel uint8) {
 			{
 				event := events.NewEvent(req.Key, req.Payload)
 				event.AuthLevel = req.AuthLevel
+				event.ReturnAddr = req.ReturnAddr
 				events.Publish(event)
 				connection.sendStatusMessage(req.Id, "ok", "successfully published event to "+req.Key)
 			}

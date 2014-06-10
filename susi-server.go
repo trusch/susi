@@ -31,12 +31,12 @@ func main() {
 
 	events.Go()
 
-	/*	go func() {
+	go func() {
 		ch, _ := events.Subscribe("*", 0)
 		for event := range ch {
 			log.Print(event)
 		}
-	}()*/
+	}()
 
 	state.Go()
 	config.Go()
