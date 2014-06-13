@@ -183,7 +183,7 @@ func HandleConnection(conn net.Conn, authlevel uint8) {
 				if req.Key == "controller::auth::info" {
 					connection.sendStatusMessage(req.Id, "ok", "successfully published event to "+req.Key)
 					event := events.NewEvent(req.ReturnAddr, map[string]interface{}{
-						"success":  true,
+						"error":    false,
 						"username": connection.username,
 					})
 					event.AuthLevel = connection.authlevel
@@ -195,7 +195,7 @@ func HandleConnection(conn net.Conn, authlevel uint8) {
 					payload, ok := req.Payload.(map[string]interface{})
 					if !ok {
 						event := events.NewEvent(req.ReturnAddr, map[string]interface{}{
-							"success": false,
+							"error":   true,
 							"message": "malformed payload",
 						})
 						event.AuthLevel = connection.authlevel
@@ -206,7 +206,7 @@ func HandleConnection(conn net.Conn, authlevel uint8) {
 					password, ok2 := payload["password"].(string)
 					if !ok1 || !ok2 {
 						event := events.NewEvent(req.ReturnAddr, map[string]interface{}{
-							"success": false,
+							"error":   true,
 							"message": "malformed payload",
 						})
 						event.AuthLevel = connection.authlevel
@@ -215,13 +215,14 @@ func HandleConnection(conn net.Conn, authlevel uint8) {
 					}
 					if connection.checkUser(username, password) {
 						event := events.NewEvent(req.ReturnAddr, map[string]interface{}{
-							"success": true,
+							"error":    false,
+							"username": connection.username,
 						})
 						event.AuthLevel = req.AuthLevel
 						events.Publish(event)
 					} else {
 						event := events.NewEvent(req.ReturnAddr, map[string]interface{}{
-							"success": false,
+							"error":   true,
 							"message": "wrong username/password",
 						})
 						event.AuthLevel = connection.authlevel
@@ -234,7 +235,8 @@ func HandleConnection(conn net.Conn, authlevel uint8) {
 					connection.username = "anonymous"
 					connection.authlevel = 3
 					event := events.NewEvent(req.ReturnAddr, map[string]interface{}{
-						"success": true,
+						"error":    false,
+						"username": connection.username,
 					})
 					event.AuthLevel = connection.authlevel
 					events.Publish(event)
