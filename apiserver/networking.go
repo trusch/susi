@@ -12,9 +12,12 @@
 package apiserver
 
 import (
+	"code.google.com/p/go-uuid/uuid"
 	"crypto/tls"
+
 	"encoding/json"
 	"flag"
+	"github.com/trusch/susi/authentification"
 	"github.com/trusch/susi/events"
 	"github.com/trusch/susi/state"
 	"log"
@@ -32,7 +35,7 @@ type ApiMessage struct {
 	AuthLevel  uint8       `json:"authlevel,omitempty"`
 	Type       string      `json:"type"`
 	Key        string      `json:"key"`
-	ReturnAddr string      `json:"returnaddr"`
+	ReturnAddr string      `json:"returnaddr,omitempty"`
 	Payload    interface{} `json:"payload,omitempty"`
 }
 
@@ -48,6 +51,8 @@ type Connection struct {
 	conn          net.Conn
 	sender        *SyncedSender
 	subscribtions subscribtionsType
+	username      string
+	authlevel     uint8
 }
 
 func NewConnection(conn net.Conn) *Connection {
@@ -55,6 +60,8 @@ func NewConnection(conn net.Conn) *Connection {
 	connection.conn = conn
 	connection.sender = NewSyncedSender(conn)
 	connection.subscribtions = make(subscribtionsType)
+	connection.authlevel = 3
+	connection.username = "anonymous"
 	return connection
 }
 
@@ -70,7 +77,6 @@ func (conn *Connection) sendStatusMessage(id int64, key, msg string) {
 
 func (conn *Connection) subscribe(req *ApiMessage) {
 	topic := req.Key
-	log.Print("Before subscribe: ", conn)
 	if _, ok := conn.subscribtions[topic]; !ok {
 		eventChan, unsubscribeChan := events.Subscribe(topic, req.AuthLevel)
 		closeChan := make(chan bool)
@@ -104,25 +110,42 @@ func (conn *Connection) subscribe(req *ApiMessage) {
 			}
 		}()
 		conn.sendStatusMessage(req.Id, "ok", "successfully subscribed to "+topic)
-		log.Print("after subscribe (success): ", conn)
 	} else {
 		conn.sendStatusMessage(req.Id, "error", "you are allready subscribed to "+topic)
-		log.Print("after subscribe (error): ", conn)
 	}
 }
 
 func (conn *Connection) unsubscribe(req *ApiMessage) {
 	topic := req.Key
-	log.Print("before unsubscribe: ", conn)
 	if ch, ok := conn.subscribtions[topic]; ok {
 		ch <- true
 		delete(conn.subscribtions, topic)
-		log.Print("after unsubscribe (success): ", conn)
 		conn.sendStatusMessage(req.Id, "ok", "successfully unsubscribed from "+topic)
 	} else {
-		log.Print("after unsubscribe (error): ", conn)
 		conn.sendStatusMessage(req.Id, "error", "you are not subscribed to "+topic)
 	}
+}
+
+func (conn *Connection) checkUser(username, password string) bool {
+	awnserTopic := uuid.New()
+	awnserChan, closeChan := events.Subscribe(awnserTopic, 0)
+	event := events.NewEvent("authentification::checkuser", map[string]interface{}{
+		"username": username,
+		"password": password,
+	})
+	event.ReturnAddr = awnserTopic
+	event.AuthLevel = 0
+	events.Publish(event)
+	awnser_ := <-awnserChan
+	closeChan <- true
+	awnser := awnser_.Payload.(*authentification.AwnserData)
+	if awnser.Success {
+		user := awnser.Message.(*authentification.User)
+		conn.username = user.Username
+		conn.authlevel = user.AuthLevel
+		return true
+	}
+	return false
 }
 
 func HandleConnection(conn net.Conn, authlevel uint8) {
@@ -157,11 +180,72 @@ func HandleConnection(conn net.Conn, authlevel uint8) {
 			}
 		case "publish":
 			{
+				if req.Key == "controller::auth::info" {
+					connection.sendStatusMessage(req.Id, "ok", "successfully published event to "+req.Key)
+					event := events.NewEvent(req.ReturnAddr, connection.username)
+					event.AuthLevel = connection.authlevel
+					events.Publish(event)
+					break
+				}
+				if req.Key == "controller::auth::login" {
+					connection.sendStatusMessage(req.Id, "ok", "successfully published event to "+req.Key)
+					payload, ok := req.Payload.(map[string]interface{})
+					if !ok {
+						event := events.NewEvent(req.ReturnAddr, map[string]interface{}{
+							"success": false,
+							"message": "malformed payload",
+						})
+						event.AuthLevel = connection.authlevel
+						events.Publish(event)
+						break
+					}
+					username, ok1 := payload["username"].(string)
+					password, ok2 := payload["password"].(string)
+					if !ok1 || !ok2 {
+						event := events.NewEvent(req.ReturnAddr, map[string]interface{}{
+							"success": false,
+							"message": "malformed payload",
+						})
+						event.AuthLevel = connection.authlevel
+						events.Publish(event)
+						break
+					}
+					if connection.checkUser(username, password) {
+						event := events.NewEvent(req.ReturnAddr, map[string]interface{}{
+							"success": true,
+						})
+						event.AuthLevel = req.AuthLevel
+						events.Publish(event)
+					} else {
+						event := events.NewEvent(req.ReturnAddr, map[string]interface{}{
+							"success": false,
+							"message": "wrong username/password",
+						})
+						event.AuthLevel = connection.authlevel
+						events.Publish(event)
+					}
+					break
+				}
+				if req.Key == "controller::auth::logout" {
+					connection.sendStatusMessage(req.Id, "ok", "successfully published event to "+req.Key)
+					connection.username = "anonymous"
+					connection.authlevel = 3
+					event := events.NewEvent(req.ReturnAddr, map[string]interface{}{
+						"success": true,
+					})
+					event.AuthLevel = connection.authlevel
+					events.Publish(event)
+					break
+				}
 				event := events.NewEvent(req.Key, req.Payload)
 				event.AuthLevel = req.AuthLevel
 				event.ReturnAddr = req.ReturnAddr
-				events.Publish(event)
-				connection.sendStatusMessage(req.Id, "ok", "successfully published event to "+req.Key)
+				found := events.Publish(event)
+				if found {
+					connection.sendStatusMessage(req.Id, "ok", "successfully published event to "+req.Key)
+				} else {
+					connection.sendStatusMessage(req.Id, "error", "nobody is subscribed to "+req.Key)
+				}
 			}
 		case "set":
 			{
@@ -213,12 +297,30 @@ func HandleConnection(conn net.Conn, authlevel uint8) {
 				state.Unset(req.Key)
 				connection.sendStatusMessage(req.Id, "ok", "successfully unset data from "+req.Key)
 			}
+		case "login":
+			{
+				username := req.Key
+				password, ok := req.Payload.(string)
+				if !ok {
+					connection.sendStatusMessage(req.Id, "error", "no password provided")
+				}
+				if connection.checkUser(username, password) {
+					connection.sendStatusMessage(req.Id, "ok", "successfully logged in as "+username)
+				} else {
+					connection.sendStatusMessage(req.Id, "error", "failed logging in as "+username)
+				}
+			}
+		case "logout":
+			{
+				connection.username = "anonymous"
+				connection.authlevel = 3
+				connection.sendStatusMessage(req.Id, "ok", "successfully logged out")
+			}
 		default:
 			{
 				connection.sendStatusMessage(req.Id, "error", "no such request type: "+req.Type)
 			}
 		}
-		// fmt.Println("Request: ",req)
 	}
 }
 
@@ -289,7 +391,7 @@ func Go() {
 				log.Print(err)
 				continue
 			}
-			go HandleConnection(conn, 2)
+			go HandleConnection(conn, 3)
 		}
 	}()
 	log.Print("successfully started susi api server on ", listener.Addr())

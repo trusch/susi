@@ -196,6 +196,7 @@ func (ptr *EventsHandler) ServeHTTP(resp http.ResponseWriter, req *http.Request)
 	id := cookie.Value
 	authlevel_, _ := strconv.Atoi(req.Header.Get("authlevel"))
 	authlevel := uint8(authlevel_)
+	username := req.Header.Get("username")
 	path := req.URL.Path
 	switch {
 	case strings.HasPrefix(path, "/events/publish"):
@@ -222,6 +223,7 @@ func (ptr *EventsHandler) ServeHTTP(resp http.ResponseWriter, req *http.Request)
 			event := events.NewEvent(msg.Key, msg.Payload)
 			event.AuthLevel = msg.AuthLevel
 			event.ReturnAddr = msg.ReturnAddr
+			event.Username = username
 			events.Publish(event)
 			resp.WriteHeader(http.StatusOK)
 			return

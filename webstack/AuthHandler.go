@@ -12,11 +12,14 @@
 package webstack
 
 import (
+	"code.google.com/p/go-uuid/uuid"
 	"crypto/aes"
 	"crypto/sha512"
 	"encoding/base64"
 	"encoding/json"
 	"flag"
+	"github.com/trusch/susi/authentification"
+	"github.com/trusch/susi/events"
 	"github.com/trusch/susi/state"
 	"io"
 	"io/ioutil"
@@ -31,7 +34,6 @@ var cookieKey = flag.String("webstack.cookiekey", "foobar", "The key which is us
 type AuthHandler struct {
 	defaultHandler http.Handler
 	sessionManager *SessionManager
-	userManager    *UserManager
 	cookieKey      []byte
 }
 
@@ -39,7 +41,6 @@ func NewAuthHandler(defaultHandler http.Handler) *AuthHandler {
 	result := new(AuthHandler)
 	result.defaultHandler = defaultHandler
 	result.sessionManager = NewSessionManager()
-	result.userManager = NewUserManager()
 
 	cookieKeyStr := state.Get("webstack.cookiekey").(string)
 	hash := sha512.New()
@@ -100,11 +101,32 @@ func (ptr *AuthHandler) sessionHandling(resp http.ResponseWriter, req *http.Requ
 	return sessionId, nil
 }
 
+func (ptr *AuthHandler) checkUser(username, password string) *authentification.User {
+	awnserTopic := uuid.New()
+	awnserChan, closeChan := events.Subscribe(awnserTopic, 0)
+	event := events.NewEvent("authentification::checkuser", map[string]interface{}{
+		"username": username,
+		"password": password,
+	})
+	event.ReturnAddr = awnserTopic
+	event.AuthLevel = 0
+	events.Publish(event)
+	awnser_ := <-awnserChan
+	closeChan <- true
+	awnser := awnser_.Payload.(*authentification.AwnserData)
+	if awnser.Success {
+		return awnser.Message.(*authentification.User)
+	}
+	return nil
+}
+
 func (ptr *AuthHandler) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 	sessionId, err := ptr.sessionHandling(resp, req)
 	session := ptr.sessionManager.GetSession(sessionId)
 	req.Header.Del("authlevel")
-	req.Header.Add("authlevel", strconv.Itoa(session.AuthLevel))
+	req.Header.Add("authlevel", strconv.Itoa(int(session.AuthLevel)))
+	req.Header.Del("username")
+	req.Header.Add("username", session.User)
 	//log.Print("SESSION:", session)
 	path := req.URL.Path
 	if strings.HasPrefix(path, "/auth") {
@@ -125,9 +147,9 @@ func (ptr *AuthHandler) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 					resp.WriteHeader(http.StatusBadRequest)
 					return
 				}
-				if ok := ptr.userManager.CheckUser(msg.Username, msg.Password); ok {
-					session.AuthLevel = 2
-					session.User = msg.Username
+				if user := ptr.checkUser(msg.Username, msg.Password); user != nil {
+					session.AuthLevel = user.AuthLevel
+					session.User = user.Username
 					log.Print("successfully logged in for user: ", msg.Username)
 					resp.WriteHeader(http.StatusOK)
 					return

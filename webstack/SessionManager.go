@@ -26,7 +26,7 @@ var sessionCheckInterval = flag.String("webstack.session.checkinterval", "10", "
 type Session struct {
 	Id         uint64 `json:"-"`
 	User       string `json:"user"`
-	AuthLevel  int    `json:"authlevel"`
+	AuthLevel  uint8  `json:"authlevel"`
 	ValidUntil int64  `json:"validuntil"`
 }
 
@@ -42,7 +42,7 @@ const (
 type sessionCommand struct {
 	Type      sessionCommandType
 	Username  string
-	AuthLevel int
+	AuthLevel uint8
 	Id        uint64
 	Return    chan interface{}
 }
@@ -52,7 +52,7 @@ type SessionManager struct {
 	commands chan sessionCommand
 }
 
-func (ptr *SessionManager) addSession(user string, authlevel int) (id uint64) {
+func (ptr *SessionManager) addSession(user string, authlevel uint8) (id uint64) {
 	id = uint64(time.Now().UnixNano())
 	lifetimeStr := state.Get("webstack.session.lifetime").(string)
 	lifetime, err := strconv.ParseInt(lifetimeStr, 10, 64)
@@ -157,7 +157,7 @@ func (ptr *SessionManager) backend() {
 	}
 }
 
-func (ptr *SessionManager) AddSession(name string, authlevel int) uint64 {
+func (ptr *SessionManager) AddSession(name string, authlevel uint8) uint64 {
 	ret := make(chan interface{})
 	ptr.commands <- sessionCommand{
 		Type:      ADDSESSION,

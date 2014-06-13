@@ -14,15 +14,15 @@ package main
 import (
 	"flag"
 	"github.com/trusch/susi/apiserver"
+	"github.com/trusch/susi/authentification"
 	"github.com/trusch/susi/autodiscovery"
 	"github.com/trusch/susi/config"
+	"github.com/trusch/susi/controller/firebirdconnector"
 	"github.com/trusch/susi/events"
 	"github.com/trusch/susi/jsengine"
 	"github.com/trusch/susi/state"
 	"github.com/trusch/susi/webstack"
 	"log"
-
-	"github.com/trusch/susi/controller/firebirdconnector"
 )
 
 func main() {
@@ -42,6 +42,7 @@ func main() {
 	config.Go()
 	apiserver.Go()
 	autodiscovery.Go()
+	authentification.Go()
 	webstack.Go()
 	firebirdconnector.Go()
 	jsengine.Go()

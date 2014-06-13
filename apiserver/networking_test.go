@@ -78,6 +78,25 @@ var samples = []apiserverSample{
 		},
 	},
 	apiserverSample{
+		"005publish",
+		&ApiMessage{
+			Id:         12345,
+			AuthLevel:  3,
+			Type:       "publish",
+			Key:        "foo",
+			ReturnAddr: "",
+			Payload:    nil,
+		},
+		&ApiMessage{
+			Id:         12345,
+			AuthLevel:  0,
+			Type:       "status",
+			Key:        "error",
+			ReturnAddr: "",
+			Payload:    "nobody is subscribed to foo",
+		},
+	},
+	apiserverSample{
 		"unsubscribe",
 		&ApiMessage{
 			Id:         12345,
@@ -113,25 +132,6 @@ var samples = []apiserverSample{
 			Key:        "error",
 			ReturnAddr: "",
 			Payload:    "you are not subscribed to foobar",
-		},
-	},
-	apiserverSample{
-		"005publish",
-		&ApiMessage{
-			Id:         12345,
-			AuthLevel:  3,
-			Type:       "publish",
-			Key:        "foo",
-			ReturnAddr: "",
-			Payload:    nil,
-		},
-		&ApiMessage{
-			Id:         12345,
-			AuthLevel:  0,
-			Type:       "status",
-			Key:        "ok",
-			ReturnAddr: "",
-			Payload:    "successfully published event to foo",
 		},
 	},
 	apiserverSample{
