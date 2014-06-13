@@ -182,7 +182,10 @@ func HandleConnection(conn net.Conn, authlevel uint8) {
 			{
 				if req.Key == "controller::auth::info" {
 					connection.sendStatusMessage(req.Id, "ok", "successfully published event to "+req.Key)
-					event := events.NewEvent(req.ReturnAddr, connection.username)
+					event := events.NewEvent(req.ReturnAddr, map[string]interface{}{
+						"success":  true,
+						"username": connection.username,
+					})
 					event.AuthLevel = connection.authlevel
 					events.Publish(event)
 					break
