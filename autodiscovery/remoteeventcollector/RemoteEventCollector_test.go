@@ -13,7 +13,9 @@ package remoteeventcollector
 
 import (
 	"github.com/trusch/susi/apiserver"
+	"github.com/trusch/susi/config"
 	"github.com/trusch/susi/events"
+	"github.com/trusch/susi/session"
 	"github.com/trusch/susi/state"
 	"log"
 	"testing"
@@ -23,6 +25,8 @@ import (
 func TestRemoteEventCollector(t *testing.T) {
 	events.Go()
 	state.Go()
+	config.Go()
+	session.Go()
 
 	state.Set("apiserver.port", "12345")
 	state.Set("apiserver.tls.port", "")

@@ -19,6 +19,7 @@ import (
 	"flag"
 	"github.com/trusch/susi/authentification"
 	"github.com/trusch/susi/events"
+	"github.com/trusch/susi/session"
 	"github.com/trusch/susi/state"
 	"log"
 	"net"
@@ -37,6 +38,7 @@ type ApiMessage struct {
 	Key        string      `json:"key"`
 	ReturnAddr string      `json:"returnaddr,omitempty"`
 	Payload    interface{} `json:"payload,omitempty"`
+	Username   string      `json:"username,omitempty"`
 }
 
 func NewApiMessage() *ApiMessage {
@@ -77,6 +79,7 @@ func (conn *Connection) sendStatusMessage(id int64, key, msg string) {
 
 func (conn *Connection) subscribe(req *ApiMessage) {
 	topic := req.Key
+	log.Print("got subscribe")
 	if _, ok := conn.subscribtions[topic]; !ok {
 		eventChan, unsubscribeChan := events.Subscribe(topic, req.AuthLevel)
 		closeChan := make(chan bool)
@@ -90,12 +93,12 @@ func (conn *Connection) subscribe(req *ApiMessage) {
 				case event := <-eventChan:
 					{
 						resp := NewApiMessage()
-						log.Print(resp)
 						resp.AuthLevel = event.AuthLevel
 						resp.Id = req.Id
 						resp.Type = "event"
 						resp.Key = event.Topic
 						resp.Payload = event.Payload
+						resp.Username = event.Username
 						err := conn.sender.Send(resp)
 						if err != nil {
 							log.Print(err)
@@ -148,9 +151,21 @@ func (conn *Connection) checkUser(username, password string) bool {
 	return false
 }
 
-func HandleConnection(conn net.Conn, authlevel uint8) {
+func HandleConnection(conn net.Conn, sessionId uint64) {
+	defer log.Print("connection died")
+	data, err := events.Request("session::get", sessionId)
+	if err != nil {
+		log.Print(err)
+		return
+	}
+	session := data.(*session.Session)
+	authlevel := session.Data["authlevel"].(uint8)
+	username := session.Data["username"].(string)
+	log.Printf("handle session: %v %v", username, authlevel)
 	conn.SetDeadline(time.Time{})
 	connection := NewConnection(conn)
+	connection.username = username
+	connection.authlevel = authlevel
 	defer func() {
 		for _, ch := range connection.subscribtions {
 			ch <- true
@@ -180,71 +195,10 @@ func HandleConnection(conn net.Conn, authlevel uint8) {
 			}
 		case "publish":
 			{
-				if req.Key == "controller::auth::info" {
-					connection.sendStatusMessage(req.Id, "ok", "successfully published event to "+req.Key)
-					event := events.NewEvent(req.ReturnAddr, map[string]interface{}{
-						"error":    false,
-						"username": connection.username,
-					})
-					event.AuthLevel = connection.authlevel
-					events.Publish(event)
-					break
-				}
-				if req.Key == "controller::auth::login" {
-					connection.sendStatusMessage(req.Id, "ok", "successfully published event to "+req.Key)
-					payload, ok := req.Payload.(map[string]interface{})
-					if !ok {
-						event := events.NewEvent(req.ReturnAddr, map[string]interface{}{
-							"error":   true,
-							"message": "malformed payload",
-						})
-						event.AuthLevel = connection.authlevel
-						events.Publish(event)
-						break
-					}
-					username, ok1 := payload["username"].(string)
-					password, ok2 := payload["password"].(string)
-					if !ok1 || !ok2 {
-						event := events.NewEvent(req.ReturnAddr, map[string]interface{}{
-							"error":   true,
-							"message": "malformed payload",
-						})
-						event.AuthLevel = connection.authlevel
-						events.Publish(event)
-						break
-					}
-					if connection.checkUser(username, password) {
-						event := events.NewEvent(req.ReturnAddr, map[string]interface{}{
-							"error":    false,
-							"username": connection.username,
-						})
-						event.AuthLevel = req.AuthLevel
-						events.Publish(event)
-					} else {
-						event := events.NewEvent(req.ReturnAddr, map[string]interface{}{
-							"error":   true,
-							"message": "wrong username/password",
-						})
-						event.AuthLevel = connection.authlevel
-						events.Publish(event)
-					}
-					break
-				}
-				if req.Key == "controller::auth::logout" {
-					connection.sendStatusMessage(req.Id, "ok", "successfully published event to "+req.Key)
-					connection.username = "anonymous"
-					connection.authlevel = 3
-					event := events.NewEvent(req.ReturnAddr, map[string]interface{}{
-						"error":    false,
-						"username": connection.username,
-					})
-					event.AuthLevel = connection.authlevel
-					events.Publish(event)
-					break
-				}
 				event := events.NewEvent(req.Key, req.Payload)
 				event.AuthLevel = req.AuthLevel
 				event.ReturnAddr = req.ReturnAddr
+				event.SessionId = session.Id
 				found := events.Publish(event)
 				if found {
 					connection.sendStatusMessage(req.Id, "ok", "successfully published event to "+req.Key)
@@ -376,9 +330,25 @@ func Go() {
 					}
 				}
 				if peerCertIsMyCert {
-					go HandleConnection(conn, 0)
+					data, err := events.Request("session::add", map[string]interface{}{
+						"username":  "anonymous",
+						"authlevel": uint8(0),
+					})
+					if err != nil {
+						log.Print(err)
+						continue
+					}
+					go HandleConnection(conn, data.(uint64))
 				} else {
-					go HandleConnection(conn, 1)
+					data, err := events.Request("session::add", map[string]interface{}{
+						"username":  "anonymous",
+						"authlevel": uint8(3),
+					})
+					if err != nil {
+						log.Print(err)
+						continue
+					}
+					go HandleConnection(conn, data.(uint64))
 				}
 			}
 		}()
@@ -396,7 +366,15 @@ func Go() {
 				log.Print(err)
 				continue
 			}
-			go HandleConnection(conn, 3)
+			data, err := events.Request("session::add", map[string]interface{}{
+				"username":  "anonymous",
+				"authlevel": uint8(3),
+			})
+			if err != nil {
+				log.Print(err)
+				continue
+			}
+			go HandleConnection(conn, data.(uint64))
 		}
 	}()
 	log.Print("successfully started susi api server on ", listener.Addr())

@@ -41,9 +41,9 @@ func Go() {
 	handler.Handle("/events/", eventsHandler)
 	handler.Handle("/ws", websocket.Handler(func(ws *websocket.Conn) {
 		req := ws.Request()
-		authlevel_, _ := strconv.Atoi(req.Header.Get("authlevel"))
-		authlevel := uint8(authlevel_)
-		apiserver.HandleConnection(ws, authlevel)
+		sessionId_, _ := strconv.Atoi(req.Header.Get("sessionid"))
+		sessionId := uint64(sessionId_)
+		apiserver.HandleConnection(ws, sessionId)
 	}))
 	handler.Handle("/", http.RedirectHandler("/assets/main.html", http.StatusMovedPermanently))
 

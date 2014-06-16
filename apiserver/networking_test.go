@@ -14,15 +14,20 @@ package apiserver
 import (
 	"crypto/tls"
 	"encoding/json"
+	"github.com/trusch/susi/config"
 	"github.com/trusch/susi/events"
+	"github.com/trusch/susi/session"
 	"github.com/trusch/susi/state"
+	"log"
 	"net"
 	"testing"
 )
 
 func init() {
-	state.Go()
 	events.Go()
+	state.Go()
+	config.Go()
+	session.Go()
 
 	state.Set("apiserver.port", "12345")
 	state.Set("apiserver.tls.port", "12346")
@@ -308,8 +313,6 @@ func CompareApiMessages(m1, m2 *ApiMessage, t *testing.T, testcase string) {
 
 func testApiServerBasic(t *testing.T) {
 
-	events.Reset()
-
 	conn, err := net.Dial("tcp", "localhost:12345")
 	if err != nil {
 		t.Error("cant connect standard tcp socket (", err, ")")
@@ -321,6 +324,7 @@ func testApiServerBasic(t *testing.T) {
 	var response *ApiMessage
 
 	for _, sample := range samples {
+		log.Print("start sample ", sample)
 		err := encoder.Encode(sample.Input)
 		if err != nil {
 			t.Errorf("cant send sample %v to server: %v", sample.Name, err)
@@ -330,6 +334,7 @@ func testApiServerBasic(t *testing.T) {
 			t.Errorf("cant decode awnser of sample %v: %v", sample.Name, err)
 		}
 		CompareApiMessages(sample.Output, response, t, sample.Name)
+		log.Print("finished ", sample)
 	}
 
 	err = conn.Close()
@@ -339,8 +344,6 @@ func testApiServerBasic(t *testing.T) {
 }
 
 func testTLS(t *testing.T) {
-
-	events.Reset()
 
 	cert, err := tls.LoadX509KeyPair("/opt/cert.pem", "/opt/key.pem")
 	if err != nil {

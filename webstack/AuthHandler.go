@@ -12,7 +12,6 @@
 package webstack
 
 import (
-	"code.google.com/p/go-uuid/uuid"
 	"crypto/aes"
 	"crypto/sha512"
 	"encoding/base64"
@@ -20,9 +19,9 @@ import (
 	"flag"
 	"github.com/trusch/susi/authentification"
 	"github.com/trusch/susi/events"
+	"github.com/trusch/susi/session"
 	"github.com/trusch/susi/state"
 	"io"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"strconv"
@@ -33,14 +32,12 @@ var cookieKey = flag.String("webstack.cookiekey", "foobar", "The key which is us
 
 type AuthHandler struct {
 	defaultHandler http.Handler
-	sessionManager *SessionManager
 	cookieKey      []byte
 }
 
 func NewAuthHandler(defaultHandler http.Handler) *AuthHandler {
 	result := new(AuthHandler)
 	result.defaultHandler = defaultHandler
-	result.sessionManager = NewSessionManager()
 
 	cookieKeyStr := state.Get("webstack.cookiekey").(string)
 	hash := sha512.New()
@@ -51,7 +48,14 @@ func NewAuthHandler(defaultHandler http.Handler) *AuthHandler {
 }
 
 func (ptr *AuthHandler) addSession(resp http.ResponseWriter) (uint64, error) {
-	sessionId := ptr.sessionManager.AddSession("anonymous", 3)
+	data, err := events.Request("session::add", map[string]interface{}{
+		"username":  "anonymous",
+		"authlevel": uint8(3),
+	})
+	if err != nil {
+		return 0, err
+	}
+	sessionId := data.(uint64)
 	sessionIdBytes := []byte(strconv.FormatUint(sessionId, 16))
 	cipher, err := aes.NewCipher(ptr.cookieKey)
 	if err != nil {
@@ -88,51 +92,50 @@ func (ptr *AuthHandler) getSession(req *http.Request) (uint64, error) {
 
 func (ptr *AuthHandler) sessionHandling(resp http.ResponseWriter, req *http.Request) (uint64, error) {
 	sessionId, err := ptr.getSession(req)
-	//log.Println(sessionId)
 	if err != nil {
 		log.Print(err)
 		return ptr.addSession(resp)
 	}
-	session := ptr.sessionManager.GetSession(sessionId)
-	if session == nil {
-		log.Print("dont find session...")
+	_, err = events.Request("session::get", sessionId)
+	if err != nil {
+		log.Printf("dont find session... (%v)", err)
 		return ptr.addSession(resp)
 	}
 	return sessionId, nil
 }
 
 func (ptr *AuthHandler) checkUser(username, password string) *authentification.User {
-	awnserTopic := uuid.New()
-	awnserChan, closeChan := events.Subscribe(awnserTopic, 0)
-	event := events.NewEvent("authentification::checkuser", map[string]interface{}{
+	data, err := events.Request("authentification::checkuser", map[string]interface{}{
 		"username": username,
 		"password": password,
 	})
-	event.ReturnAddr = awnserTopic
-	event.AuthLevel = 0
-	events.Publish(event)
-	awnser_ := <-awnserChan
-	closeChan <- true
-	awnser := awnser_.Payload.(*authentification.AwnserData)
-	if awnser.Success {
-		return awnser.Message.(*authentification.User)
+	if err != nil {
+		return nil
 	}
-	return nil
+	return data.(*authentification.User)
 }
 
 func (ptr *AuthHandler) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 	sessionId, err := ptr.sessionHandling(resp, req)
-	session := ptr.sessionManager.GetSession(sessionId)
+	data, err := events.Request("session::get", sessionId)
+	if err != nil {
+		log.Fatal(err)
+	}
+	session := data.(*session.Session)
 	req.Header.Del("authlevel")
-	req.Header.Add("authlevel", strconv.Itoa(int(session.AuthLevel)))
+	req.Header.Add("authlevel", strconv.Itoa(int(session.Data["authlevel"].(uint8))))
 	req.Header.Del("username")
-	req.Header.Add("username", session.User)
+	req.Header.Add("username", session.Data["username"].(string))
+	req.Header.Del("sessionid")
+	req.Header.Add("sessionid", strconv.Itoa(int(session.Id)))
 	//log.Print("SESSION:", session)
 	path := req.URL.Path
 	if strings.HasPrefix(path, "/auth") {
 		switch {
 		case strings.HasPrefix(path, "/auth/login"):
 			{
+				username := ""
+				password := ""
 				reader := io.LimitReader(req.Body, 1024)
 				decoder := json.NewDecoder(reader)
 				type authMsg struct {
@@ -141,15 +144,17 @@ func (ptr *AuthHandler) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 				}
 				msg := new(authMsg)
 				err = decoder.Decode(&msg)
+				username = msg.Username
+				password = msg.Password
 				if err != nil {
 					log.Print(err)
-					log.Print(ioutil.ReadAll(reader))
-					resp.WriteHeader(http.StatusBadRequest)
-					return
+					vals := req.URL.Query()
+					username = vals.Get("username")
+					password = vals.Get("password")
 				}
-				if user := ptr.checkUser(msg.Username, msg.Password); user != nil {
-					session.AuthLevel = user.AuthLevel
-					session.User = user.Username
+				if user := ptr.checkUser(username, password); user != nil {
+					session.Data["authlevel"] = user.AuthLevel
+					session.Data["username"] = user.Username
 					log.Print("successfully logged in for user: ", msg.Username)
 					resp.WriteHeader(http.StatusOK)
 					return
@@ -161,8 +166,8 @@ func (ptr *AuthHandler) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 			}
 		case strings.HasPrefix(path, "/auth/logout"):
 			{
-				session.AuthLevel = 3
-				session.User = "anonymous"
+				session.Data["authlevel"] = uint8(3)
+				session.Data["username"] = "anonymous"
 				resp.WriteHeader(http.StatusOK)
 				return
 			}
@@ -174,7 +179,7 @@ func (ptr *AuthHandler) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 			}
 		case strings.HasPrefix(path, "/auth/keepalive"):
 			{
-				ptr.sessionManager.UpdateSession(sessionId)
+				events.Request("session::touch", sessionId)
 				resp.WriteHeader(http.StatusOK)
 				return
 			}

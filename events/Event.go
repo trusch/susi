@@ -18,6 +18,7 @@ import (
 
 type Event struct {
 	Id         uint64      `json:"id"`
+	SessionId  uint64      `json:"sessionid"`
 	Topic      string      `json:"topic"`
 	AuthLevel  uint8       `json:"authlevel"`
 	ReturnAddr string      `json:"returnaddr"`

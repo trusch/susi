@@ -41,18 +41,18 @@ func TestAddUser(t *testing.T) {
 	request.ReturnAddr = "awnserChan"
 	events.Publish(request)
 	awnser := <-awnserChan
-	payload, ok := awnser.Payload.(*AwnserData)
-	assert(t, ok, "payload is not a AwnserData struct: %T", awnser.Payload)
-	assert(t, payload.Success == true, "creating testuser failed: %v", payload)
+	payload, ok := awnser.Payload.(map[string]interface{})
+	assert(t, ok, "payload is not a map: %T", awnser.Payload)
+	assert(t, payload["error"] == false, "creating testuser failed: %v", payload)
 
 	/**
 	 * Testing of allready taken username
 	 */
 	events.Publish(request)
 	awnser = <-awnserChan
-	payload, ok = awnser.Payload.(*AwnserData)
-	assert(t, ok, "payload is not a AwnserData struct: %T", awnser.Payload)
-	assert(t, payload.Success == false, "creating testuser should have been failed: %v", payload)
+	payload, ok = awnser.Payload.(map[string]interface{})
+	assert(t, ok, "payload is not a map: %T", awnser.Payload)
+	assert(t, payload["error"] == true, "creating testuser should have been failed: %v", payload)
 
 	/**
 	 * Testing if authlevel 0 is needed
@@ -61,9 +61,9 @@ func TestAddUser(t *testing.T) {
 	request.Payload.(map[string]interface{})["username"] = "foo"
 	events.Publish(request)
 	awnser = <-awnserChan
-	payload, ok = awnser.Payload.(*AwnserData)
-	assert(t, ok, "payload is not a AwnserData struct: %T", awnser.Payload)
-	assert(t, payload.Success == false, "creating testuser should have been failed: %v", payload)
+	payload, ok = awnser.Payload.(map[string]interface{})
+	assert(t, ok, "payload is not a map: %T", awnser.Payload)
+	assert(t, payload["error"] == true, "creating testuser should have been failed: %v", payload)
 
 	/**
 	 * Test adding a second user
@@ -76,9 +76,9 @@ func TestAddUser(t *testing.T) {
 	request.AuthLevel = 0
 	events.Publish(request)
 	awnser = <-awnserChan
-	payload, ok = awnser.Payload.(*AwnserData)
-	assert(t, ok, "payload is not a AwnserData struct: %T", awnser.Payload)
-	assert(t, payload.Success == true, "adding of a second testuser should have been succeded: %v", payload)
+	payload, ok = awnser.Payload.(map[string]interface{})
+	assert(t, ok, "payload is not a map: %T", awnser.Payload)
+	assert(t, payload["error"] == false, "adding of a second testuser should have been succeded: %v", payload)
 	assert(t, userManagerRef.users[0].ID == 1 && userManagerRef.users[1].ID == 2,
 		"IDs are wrong: %v %v", userManagerRef.users[0].ID, userManagerRef.users[1].ID)
 
@@ -93,9 +93,9 @@ func TestAddUser(t *testing.T) {
 	}
 	events.Publish(request)
 	awnser = <-awnserChan
-	payload, ok = awnser.Payload.(*AwnserData)
-	assert(t, ok, "payload is not a AwnserData struct: %T", awnser.Payload)
-	assert(t, payload.Success == false, "creating testuser should have been failed: %v", payload)
+	payload, ok = awnser.Payload.(map[string]interface{})
+	assert(t, ok, "payload is not a map: %T", awnser.Payload)
+	assert(t, payload["error"] == true, "creating testuser should have been failed (malformed one): %v", payload)
 
 	/**
 	 * Testing malformed request 2
@@ -107,9 +107,9 @@ func TestAddUser(t *testing.T) {
 	}
 	events.Publish(request)
 	awnser = <-awnserChan
-	payload, ok = awnser.Payload.(*AwnserData)
-	assert(t, ok, "payload is not a AwnserData struct: %T", awnser.Payload)
-	assert(t, payload.Success == false, "creating testuser should have been failed: %v", payload)
+	payload, ok = awnser.Payload.(map[string]interface{})
+	assert(t, ok, "payload is not a map: %T", awnser.Payload)
+	assert(t, payload["error"] == true, "creating testuser should have been failed (malformed two): %v", payload)
 
 	/**
 	 * Testing malformed request 3
@@ -117,9 +117,9 @@ func TestAddUser(t *testing.T) {
 	request.Payload = ""
 	events.Publish(request)
 	awnser = <-awnserChan
-	payload, ok = awnser.Payload.(*AwnserData)
-	assert(t, ok, "payload is not a AwnserData struct: %T", awnser.Payload)
-	assert(t, payload.Success == false, "creating testuser should have been failed: %v", payload)
+	payload, ok = awnser.Payload.(map[string]interface{})
+	assert(t, ok, "payload is not a map: %T", awnser.Payload)
+	assert(t, payload["error"] == true, "creating testuser should have been failed (malformed three): %v", payload)
 
 }
 
@@ -160,9 +160,9 @@ func TestDelUser(t *testing.T) {
 	request.ReturnAddr = "awnserChan"
 	events.Publish(request)
 	awnser = <-awnserChan
-	payload, ok := awnser.Payload.(*AwnserData)
-	assert(t, ok, "payload is not a AwnserData struct: %T", awnser.Payload)
-	assert(t, payload.Success == true, "deleting of a first testuser should have been succeded: %v", payload)
+	payload, ok := awnser.Payload.(map[string]interface{})
+	assert(t, ok, "payload is not a map: %T", awnser.Payload)
+	assert(t, payload["error"] == false, "deleting of a first testuser should have been succeded: %v", payload)
 	assert(t, len(userManagerRef.users) == 1, "There should be only one user left")
 	assert(t, userManagerRef.users[0].ID == 2, "The ID should be 2")
 
@@ -176,9 +176,9 @@ func TestDelUser(t *testing.T) {
 	request.ReturnAddr = "awnserChan"
 	events.Publish(request)
 	awnser = <-awnserChan
-	payload, ok = awnser.Payload.(*AwnserData)
-	assert(t, ok, "payload is not a AwnserData struct: %T", awnser.Payload)
-	assert(t, payload.Success == false, "deleting of nonexistent testuser should have been failed: %v", payload)
+	payload, ok = awnser.Payload.(map[string]interface{})
+	assert(t, ok, "payload is not a map: %T", awnser.Payload)
+	assert(t, payload["error"] == true, "deleting of nonexistent testuser should have been failed: %v", payload)
 
 	/**
 	 * Testing if authlevel 0 is needed
@@ -186,9 +186,9 @@ func TestDelUser(t *testing.T) {
 	request.AuthLevel = 1
 	events.Publish(request)
 	awnser = <-awnserChan
-	payload, ok = awnser.Payload.(*AwnserData)
-	assert(t, ok, "payload is not a AwnserData struct: %T", awnser.Payload)
-	assert(t, payload.Success == false, "deleting testuser should have been failed: %v", payload)
+	payload, ok = awnser.Payload.(map[string]interface{})
+	assert(t, ok, "payload is not a map: %T", awnser.Payload)
+	assert(t, payload["error"] == true, "deleting of testuser should have been failed (insufficient authlevel): %v", payload)
 
 	request.AuthLevel = 0
 
@@ -198,9 +198,9 @@ func TestDelUser(t *testing.T) {
 	request.Payload = map[string]interface{}{}
 	events.Publish(request)
 	awnser = <-awnserChan
-	payload, ok = awnser.Payload.(*AwnserData)
-	assert(t, ok, "payload is not a AwnserData struct: %T", awnser.Payload)
-	assert(t, payload.Success == false, "deleting testuser should have been failed: %v", payload)
+	payload, ok = awnser.Payload.(map[string]interface{})
+	assert(t, ok, "payload is not a map: %T", awnser.Payload)
+	assert(t, payload["error"] == true, "deleting of testuser should have been failed (malformed one): %v", payload)
 
 	/**
 	 * Testing malformed request 2
@@ -210,9 +210,9 @@ func TestDelUser(t *testing.T) {
 	}
 	events.Publish(request)
 	awnser = <-awnserChan
-	payload, ok = awnser.Payload.(*AwnserData)
-	assert(t, ok, "payload is not a AwnserData struct: %T", awnser.Payload)
-	assert(t, payload.Success == false, "deleting testuser should have been failed: %v", payload)
+	payload, ok = awnser.Payload.(map[string]interface{})
+	assert(t, ok, "payload is not a map: %T", awnser.Payload)
+	assert(t, payload["error"] == true, "deleting of testuser should have been failed (malformed two): %v", payload)
 
 	/**
 	 * Testing malformed request 3
@@ -220,9 +220,9 @@ func TestDelUser(t *testing.T) {
 	request.Payload = ""
 	events.Publish(request)
 	awnser = <-awnserChan
-	payload, ok = awnser.Payload.(*AwnserData)
-	assert(t, ok, "payload is not a AwnserData struct: %T", awnser.Payload)
-	assert(t, payload.Success == false, "creating testuser should have been failed: %v", payload)
+	payload, ok = awnser.Payload.(map[string]interface{})
+	assert(t, ok, "payload is not a map: %T", awnser.Payload)
+	assert(t, payload["error"] == true, "deleting of testuser should have been failed (malformed three): %v", payload)
 }
 
 func TestCheckUser(t *testing.T) {
@@ -256,12 +256,12 @@ func TestCheckUser(t *testing.T) {
 	request.ReturnAddr = "awnserChan"
 	events.Publish(request)
 	awnser = <-awnserChan
-	payload, ok := awnser.Payload.(*AwnserData)
-	assert(t, ok, "payload is not a AwnserData struct: %T", awnser.Payload)
-	user, ok := payload.Message.(*User)
+	payload, ok := awnser.Payload.(map[string]interface{})
+	assert(t, ok, "payload is not a map: %T", awnser.Payload)
+	assert(t, payload["error"] == false, "checking should habe been succeeded: %v", payload)
+	user, ok := payload["data"].(*User)
 	assert(t, ok, "checkuser doesnt return a user: %v", payload)
 	assert(t, user.Username == "test1", "username should be test1: %v", user.Username)
-	assert(t, user.Password == "", "password should be empty in reply: %v", user.Username)
 
 	/**
 	 * Check first user for error
@@ -274,9 +274,9 @@ func TestCheckUser(t *testing.T) {
 	request.ReturnAddr = "awnserChan"
 	events.Publish(request)
 	awnser = <-awnserChan
-	payload, ok = awnser.Payload.(*AwnserData)
-	assert(t, ok, "payload is not a AwnserData struct: %T", awnser.Payload)
-	assert(t, payload.Message == nil, "user should be nil: %v", payload)
+	payload, ok = awnser.Payload.(map[string]interface{})
+	assert(t, ok, "payload is not a map: %T", awnser.Payload)
+	assert(t, payload["error"] == true, "checking should habe been failed: %v", payload)
 
 	/**
 	 * Testing if authlevel 0 is needed
@@ -284,9 +284,9 @@ func TestCheckUser(t *testing.T) {
 	request.AuthLevel = 1
 	events.Publish(request)
 	awnser = <-awnserChan
-	payload, ok = awnser.Payload.(*AwnserData)
-	assert(t, ok, "payload is not a AwnserData struct: %T", awnser.Payload)
-	assert(t, payload.Success == false, "creating testuser should have been failed: %v", payload)
+	payload, ok = awnser.Payload.(map[string]interface{})
+	assert(t, ok, "payload is not a map: %T", awnser.Payload)
+	assert(t, payload["error"] == true, "checking should habe been failed: %v", payload)
 
 	request.AuthLevel = 0
 
@@ -296,9 +296,9 @@ func TestCheckUser(t *testing.T) {
 	request.Payload = ""
 	events.Publish(request)
 	awnser = <-awnserChan
-	payload, ok = awnser.Payload.(*AwnserData)
-	assert(t, ok, "payload is not a AwnserData struct: %T", awnser.Payload)
-	assert(t, payload.Success == false, "checking testuser should have been failed: %v", payload)
+	payload, ok = awnser.Payload.(map[string]interface{})
+	assert(t, ok, "payload is not a map: %T", awnser.Payload)
+	assert(t, payload["error"] == true, "checking should habe been failed: %v", payload)
 
 	/**
 	 * Testing malformed request 2
@@ -309,9 +309,9 @@ func TestCheckUser(t *testing.T) {
 	}
 	events.Publish(request)
 	awnser = <-awnserChan
-	payload, ok = awnser.Payload.(*AwnserData)
-	assert(t, ok, "payload is not a AwnserData struct: %T", awnser.Payload)
-	assert(t, payload.Success == false, "checking testuser should have been failed: %v", payload)
+	payload, ok = awnser.Payload.(map[string]interface{})
+	assert(t, ok, "payload is not a map: %T", awnser.Payload)
+	assert(t, payload["error"] == true, "checking should habe been failed: %v", payload)
 
 }
 

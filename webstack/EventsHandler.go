@@ -61,7 +61,7 @@ func (handler *EventsHandler) backend() {
 
 	//Wait for cleanup and feed into handler
 	go func() {
-		ch, _ := events.Subscribe("session::delete", 0)
+		ch, _ := events.Subscribe("session::deleted", 0)
 		for evt := range ch {
 			handler.cmdChan <- &eventsCmd{
 				Type: CLEANUP,

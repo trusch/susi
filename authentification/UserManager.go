@@ -227,7 +227,7 @@ type AwnserData struct {
 
 var userManagerRef *UserManager
 
-func Go() {
+func GoUserManager() {
 	userManager := NewUserManager()
 	userManagerRef = userManager
 	addUserChan, _ := events.Subscribe("authentification::adduser", 0)
@@ -235,13 +235,11 @@ func Go() {
 	checkUserChan, _ := events.Subscribe("authentification::checkuser", 0)
 
 	awnserEvent := func(event *events.Event, success bool, message interface{}) {
-		if event.ReturnAddr != "" {
-			awnser := events.NewEvent(event.ReturnAddr, &AwnserData{
-				Success: success,
-				Message: message,
-			})
-			log.Print(awnser)
-			events.Publish(awnser)
+		log.Print(message)
+		if success {
+			events.Awnser(event, message)
+		} else {
+			events.AwnserError(event, message.(string))
 		}
 	}
 
@@ -257,10 +255,33 @@ func Go() {
 					if payload, ok := event.Payload.(map[string]interface{}); ok {
 						username, ok1 := payload["username"].(string)
 						password, ok2 := payload["password"].(string)
-						authlevel_, ok3 := payload["authlevel"].(int)
-						authlevel := uint8(authlevel_)
+						authlevel_, ok3 := payload["authlevel"]
+						authlevel := uint8(255)
+						switch authlevel_.(type) {
+						case float64:
+							{
+								authlevel = uint8(authlevel_.(float64))
+							}
+						case int:
+							{
+								authlevel = uint8(authlevel_.(int))
+							}
+						case uint:
+							{
+								authlevel = uint8(authlevel_.(uint))
+							}
+						case uint8:
+							{
+								authlevel = authlevel_.(uint8)
+							}
+						default:
+							{
+								log.Printf("failed parsing authlevel: %T", authlevel_)
+							}
+						}
 						if ok1 && ok2 && ok3 {
 							if success := userManager.AddUser(username, password, authlevel); success {
+								log.Print("successfully added user " + username)
 								awnserEvent(event, true, "")
 							} else {
 								awnserEvent(event, false, "failed adding user")
@@ -308,10 +329,10 @@ func Go() {
 							if user := userManager.CheckUser(username, password); user != nil {
 								awnserEvent(event, true, user)
 							} else {
-								awnserEvent(event, false, nil)
+								awnserEvent(event, false, "wrong password")
 							}
 						} else {
-							awnserEvent(event, false, "mcalformed payload, need 'username' field")
+							awnserEvent(event, false, "malformed payload, need 'username' field")
 						}
 					} else {
 						awnserEvent(event, false, "malformed payload, need 'username' field")
@@ -320,4 +341,9 @@ func Go() {
 			}
 		}
 	}()
+}
+
+func Go() {
+	GoUserManager()
+	GoLoginController()
 }

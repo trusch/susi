@@ -20,6 +20,7 @@ import (
 	"github.com/trusch/susi/controller/firebirdconnector"
 	"github.com/trusch/susi/events"
 	"github.com/trusch/susi/jsengine"
+	"github.com/trusch/susi/session"
 	"github.com/trusch/susi/state"
 	"github.com/trusch/susi/webstack"
 	"log"
@@ -40,6 +41,7 @@ func main() {
 
 	state.Go()
 	config.Go()
+	session.Go()
 	apiserver.Go()
 	autodiscovery.Go()
 	authentification.Go()
