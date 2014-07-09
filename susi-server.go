@@ -18,6 +18,7 @@ import (
 	"github.com/trusch/susi/autodiscovery"
 	"github.com/trusch/susi/config"
 	"github.com/trusch/susi/controller/firebirdconnector"
+	"github.com/trusch/susi/enginestarter"
 	"github.com/trusch/susi/events"
 	"github.com/trusch/susi/jsengine"
 	"github.com/trusch/susi/session"
@@ -48,6 +49,7 @@ func main() {
 	webstack.Go()
 	firebirdconnector.Go()
 	jsengine.Go()
+	enginestarter.Go()
 
 	select {}
 }

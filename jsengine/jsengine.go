@@ -15,6 +15,7 @@ import (
 	"encoding/json"
 	"flag"
 	"github.com/robertkrimen/otto"
+	_ "github.com/robertkrimen/otto/underscore"
 	"github.com/trusch/susi/events"
 	"github.com/trusch/susi/state"
 	"io/ioutil"
@@ -25,7 +26,7 @@ import (
 	"time"
 )
 
-var jsRoot = flag.String("jsengine.root", "./controller/js/", "where to search for backend js controllers")
+var jsRoot = flag.String("jsengine.root", "/usr/share/susi/controller/js/", "where to search for backend js controllers")
 
 func isGlob(pattern string) bool {
 	return strings.IndexAny(pattern, "*?[") >= 0

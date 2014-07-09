@@ -75,8 +75,8 @@ func awnserOk(evt *events.Event, result []map[string]interface{}) {
 		return
 	}
 	payload := map[string]interface{}{
-		"error":  false,
-		"result": result,
+		"error": false,
+		"data":  result,
 	}
 	res := events.NewEvent(evt.ReturnAddr, payload)
 	res.AuthLevel = 0
@@ -88,8 +88,8 @@ func awnserError(evt *events.Event, err error) {
 		return
 	}
 	payload := map[string]interface{}{
-		"error":   true,
-		"message": err.Error(),
+		"error": true,
+		"data":  err.Error(),
 	}
 	res := events.NewEvent(evt.ReturnAddr, payload)
 	res.AuthLevel = 0

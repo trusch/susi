@@ -79,6 +79,7 @@ func (ptr *RemoteEventCollector) HandleAwnsers(conn net.Conn, addr string) {
 				key := parts[0]
 				event := events.NewEvent(key, msg.Payload)
 				event.AuthLevel = msg.AuthLevel
+				event.ReturnAddr = msg.ReturnAddr
 				events.Publish(event)
 			}
 		}

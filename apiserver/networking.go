@@ -23,6 +23,9 @@ import (
 	"github.com/trusch/susi/state"
 	"log"
 	"net"
+	"os"
+	"os/signal"
+	"syscall"
 	"time"
 )
 
@@ -30,6 +33,7 @@ var apiTcpPort = flag.String("apiserver.port", "4000", "The port of the susi api
 var apiTlsPort = flag.String("apiserver.tls.port", "4001", "The port of the susi api server")
 var apiCertFile = flag.String("apiserver.tls.cert", "", "The certificate to use in the api server")
 var apiKeyFile = flag.String("apiserver.tls.key", "", "The key to use in the api server")
+var apiUnixSocket = flag.String("apiserver.unixsocket", "/ramfs/susi.sock", "The unix socket to listen on")
 
 type ApiMessage struct {
 	Id         int64       `json:"id,omitempty"`
@@ -55,6 +59,7 @@ type Connection struct {
 	subscribtions subscribtionsType
 	username      string
 	authlevel     uint8
+	session       uint64
 }
 
 func NewConnection(conn net.Conn) *Connection {
@@ -79,7 +84,6 @@ func (conn *Connection) sendStatusMessage(id int64, key, msg string) {
 
 func (conn *Connection) subscribe(req *ApiMessage) {
 	topic := req.Key
-	log.Print("got subscribe")
 	if _, ok := conn.subscribtions[topic]; !ok {
 		eventChan, unsubscribeChan := events.Subscribe(topic, req.AuthLevel)
 		closeChan := make(chan bool)
@@ -99,6 +103,7 @@ func (conn *Connection) subscribe(req *ApiMessage) {
 						resp.Key = event.Topic
 						resp.Payload = event.Payload
 						resp.Username = event.Username
+						resp.ReturnAddr = event.ReturnAddr
 						err := conn.sender.Send(resp)
 						if err != nil {
 							log.Print(err)
@@ -112,6 +117,7 @@ func (conn *Connection) subscribe(req *ApiMessage) {
 				}
 			}
 		}()
+		log.Printf("got subscription to %v from %v (%v)", topic, conn.username, conn.session)
 		conn.sendStatusMessage(req.Id, "ok", "successfully subscribed to "+topic)
 	} else {
 		conn.sendStatusMessage(req.Id, "error", "you are allready subscribed to "+topic)
@@ -161,11 +167,11 @@ func HandleConnection(conn net.Conn, sessionId uint64) {
 	session := data.(*session.Session)
 	authlevel := session.Data["authlevel"].(uint8)
 	username := session.Data["username"].(string)
-	log.Printf("handle session: %v %v", username, authlevel)
 	conn.SetDeadline(time.Time{})
 	connection := NewConnection(conn)
 	connection.username = username
 	connection.authlevel = authlevel
+	connection.session = sessionId
 	defer func() {
 		for _, ch := range connection.subscribtions {
 			ch <- true
@@ -288,6 +294,7 @@ func Go() {
 	tlsPortStr := state.Get("apiserver.tls.port").(string)
 	certStr := state.Get("apiserver.tls.cert").(string)
 	keyStr := state.Get("apiserver.tls.key").(string)
+	unixStr := state.Get("apiserver.unixsocket").(string)
 
 	if certStr != "" && keyStr != "" {
 		cert, err := tls.LoadX509KeyPair(certStr, keyStr)
@@ -378,5 +385,40 @@ func Go() {
 		}
 	}()
 	log.Print("successfully started susi api server on ", listener.Addr())
+
+	if unixStr != "" {
+		os.Remove(unixStr)
+		unixListener, err := net.Listen("unix", unixStr)
+		if err != nil {
+			log.Fatal(err)
+		}
+		go func() {
+			for {
+				conn, err := unixListener.Accept()
+				if err != nil {
+					log.Print(err)
+					continue
+				}
+				data, err := events.Request("session::add", map[string]interface{}{
+					"username":  "anonymous",
+					"authlevel": uint8(0),
+				})
+				if err != nil {
+					log.Print(err)
+					continue
+				}
+				go HandleConnection(conn, data.(uint64))
+			}
+		}()
+		sigc := make(chan os.Signal, 1)
+		signal.Notify(sigc, os.Interrupt, os.Kill, syscall.SIGTERM)
+		go func(c chan os.Signal) {
+			sig := <-c
+			log.Printf("Caught signal %s: shutting down.", sig)
+			unixListener.Close()
+			os.Exit(0)
+		}(sigc)
+		log.Print("successfully started susi api server on ", unixListener.Addr())
+	}
 	return
 }

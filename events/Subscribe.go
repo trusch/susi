@@ -48,7 +48,7 @@ type subscribeResult struct {
 }
 
 func (ptr *EventSystem) subscribe(topic string, authlevel uint8) (eventChannel chan *Event, closeChannel chan bool) {
-	eventChannel = make(chan *Event, 10)
+	eventChannel = make(chan *Event, 100)
 	closeChannel = make(chan bool)
 	id := uint64(time.Now().UnixNano())
 	if isGlob(topic) {

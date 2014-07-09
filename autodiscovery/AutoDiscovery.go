@@ -16,12 +16,13 @@ import (
 	"github.com/trusch/susi/autodiscovery/remoteeventcollector"
 	"github.com/trusch/susi/events"
 	"github.com/trusch/susi/state"
+	"log"
 	"net"
+	"os"
 	"strings"
 )
 
 var autodiscoveryMulticastAddr = flag.String("autodiscovery.mcastAddr", "224.0.0.23:42424", "the autodiscovery multicast addr")
-var autodiscoveryTcpPort = flag.String("autodiscovery.port", "42424", "the autodiscovery tcp port")
 
 type AutodiscoveryManager struct {
 	InputNew  chan string
@@ -73,6 +74,9 @@ func (ptr *AutodiscoveryManager) ListenForMulticastMessage() {
 	}
 	go func() {
 		defer socket.Close()
+		defer func() {
+			log.Print("multicast listening died!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+		}()
 		buff := make([]byte, 4096)
 		for {
 			read, err := socket.Read(buff[0:])
@@ -135,6 +139,10 @@ func Go() {
 	apiserverPort := state.Get("apiserver.port").(string)
 	apiserverAddr := GetOwnAddr(apiserverPort)
 	names := []string{"all"}
+	hostname, err := os.Hostname()
+	if err == nil {
+		names = append(names, hostname)
+	}
 	if namesFromConfig, ok := state.Get("autodiscovery.names").([]string); ok {
 		names = append(names, namesFromConfig...)
 	}

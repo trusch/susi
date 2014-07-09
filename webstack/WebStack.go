@@ -34,6 +34,11 @@ func Go() {
 	keyFile := state.Get("webstack.tls.key").(string)
 	assetsDir := state.Get("webstack.assets").(string)
 
+	if addr == "" {
+		log.Print("not starting webstack. no address given.")
+		return
+	}
+
 	eventsHandler := NewEventsHandler()
 
 	handler := http.NewServeMux()
