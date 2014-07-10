@@ -118,7 +118,6 @@ func (ptr *OttoEngine) searchForJS(root string) {
 		d.Close()
 		filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
 			name := info.Name()
-			log.Print(name)
 			if !info.IsDir() && (strings.HasSuffix(name, "js")) {
 				ptr.loadJS(path)
 			}

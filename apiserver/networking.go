@@ -24,8 +24,6 @@ import (
 	"log"
 	"net"
 	"os"
-	"os/signal"
-	"syscall"
 	"time"
 )
 
@@ -158,7 +156,6 @@ func (conn *Connection) checkUser(username, password string) bool {
 }
 
 func HandleConnection(conn net.Conn, sessionId uint64) {
-	defer log.Print("connection died")
 	data, err := events.Request("session::get", sessionId)
 	if err != nil {
 		log.Print(err)
@@ -336,6 +333,7 @@ func Go() {
 						}
 					}
 				}
+				log.Print("got new TLS connection from ", conn.RemoteAddr())
 				if peerCertIsMyCert {
 					data, err := events.Request("session::add", map[string]interface{}{
 						"username":  "anonymous",
@@ -359,6 +357,16 @@ func Go() {
 				}
 			}
 		}()
+		ch, _ := events.Subscribe("global::shutdown", 0)
+		go func() {
+			event := <-ch
+			if event.AuthLevel > 0 {
+				log.Print("wrong authlevel for global::shutdown")
+				return
+			}
+			log.Print("stopping TLS server...")
+			listener.Close()
+		}()
 		log.Print("successfully started susi tls api server on ", listener.Addr())
 	}
 
@@ -371,8 +379,10 @@ func Go() {
 			conn, err := listener.Accept()
 			if err != nil {
 				log.Print(err)
-				continue
+				break
 			}
+
+			log.Print("got new TCP connection from ", conn.RemoteAddr())
 			data, err := events.Request("session::add", map[string]interface{}{
 				"username":  "anonymous",
 				"authlevel": uint8(3),
@@ -383,6 +393,16 @@ func Go() {
 			}
 			go HandleConnection(conn, data.(uint64))
 		}
+	}()
+	ch, _ := events.Subscribe("global::shutdown", 0)
+	go func() {
+		event := <-ch
+		if event.AuthLevel > 0 {
+			log.Print("wrong authlevel for global::shutdown")
+			return
+		}
+		log.Print("stopping TCP server...")
+		listener.Close()
 	}()
 	log.Print("successfully started susi api server on ", listener.Addr())
 
@@ -397,8 +417,9 @@ func Go() {
 				conn, err := unixListener.Accept()
 				if err != nil {
 					log.Print(err)
-					continue
+					break
 				}
+				log.Print("got new UNIX connection from ", conn.RemoteAddr())
 				data, err := events.Request("session::add", map[string]interface{}{
 					"username":  "anonymous",
 					"authlevel": uint8(0),
@@ -410,14 +431,18 @@ func Go() {
 				go HandleConnection(conn, data.(uint64))
 			}
 		}()
-		sigc := make(chan os.Signal, 1)
-		signal.Notify(sigc, os.Interrupt, os.Kill, syscall.SIGTERM)
-		go func(c chan os.Signal) {
-			sig := <-c
-			log.Printf("Caught signal %s: shutting down.", sig)
+
+		ch, _ := events.Subscribe("global::shutdown", 0)
+		go func() {
+			event := <-ch
+			if event.AuthLevel > 0 {
+				log.Print("wrong authlevel for global::shutdown")
+				return
+			}
+			log.Print("stopping UNIX server...")
 			unixListener.Close()
-			os.Exit(0)
-		}(sigc)
+		}()
+
 		log.Print("successfully started susi api server on ", unixListener.Addr())
 	}
 	return

@@ -56,7 +56,6 @@ func NewSyncedSender(conn net.Conn) *SyncedSender {
 			}
 			if err != nil {
 				log.Print(err)
-				close(sw.in)
 				sw.closed = true
 				return
 			}

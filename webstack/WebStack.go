@@ -57,8 +57,8 @@ func Go() {
 	server := &http.Server{
 		Addr:           addr,
 		Handler:        authHandler,
-		ReadTimeout:    10 * time.Second,
-		WriteTimeout:   10 * time.Second,
+		ReadTimeout:    2 * time.Second,
+		WriteTimeout:   2 * time.Second,
 		MaxHeaderBytes: 1 << 20,
 	}
 

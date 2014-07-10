@@ -13,6 +13,7 @@ package main
 
 import (
 	"flag"
+	"github.com/golang/glog"
 	"github.com/trusch/susi/apiserver"
 	"github.com/trusch/susi/authentification"
 	"github.com/trusch/susi/autodiscovery"
@@ -24,21 +25,46 @@ import (
 	"github.com/trusch/susi/session"
 	"github.com/trusch/susi/state"
 	"github.com/trusch/susi/webstack"
+	//"io"
 	"log"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
 )
 
-func main() {
+var logfile = flag.String("logger.file", "", "where to write logs")
+
+func setupLogger() {
 	log.SetFlags(log.Ldate | log.Ltime | log.Lshortfile)
+}
+
+func main() {
+	defer func() { glog.Flush() }()
 	flag.Parse()
+	glog.Info("start main")
+
+	setupLogger()
 
 	events.Go()
 
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
 	go func() {
+		<-c
+		event := events.NewEvent("global::shutdown", nil)
+		event.AuthLevel = 0
+		events.Publish(event)
+		time.Sleep(1 * time.Second)
+		os.Exit(1)
+	}()
+
+	/*	go func() {
 		ch, _ := events.Subscribe("*", 0)
 		for event := range ch {
 			log.Print(event)
 		}
-	}()
+	}()*/
 
 	state.Go()
 	config.Go()
